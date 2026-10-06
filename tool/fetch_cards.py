@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Fetch every paper Planechase plane/phenomenon from Scryfall.
 
-Writes assets/cards.json and WebP images to assets/cards/. Idempotent: images
-that already exist are skipped. Requires Pillow (pip install pillow).
+Writes assets/cards.json (including artist credits) and WebP images to
+assets/cards/. Idempotent: images that already exist are skipped. Requires Pillow (pip install pillow).
 
     python3 tool/fetch_cards.py
 """
@@ -65,6 +65,7 @@ def main():
             "number": c["collector_number"],
             "type": "phenomenon" if "Phenomenon" in c["type_line"] else "plane",
             "oracleText": c.get("oracle_text", ""),
+            "artist": c.get("artist") or (c.get("card_faces") or [{}])[0].get("artist", ""),
             "image": f"assets/cards/{file_name}",
             "funny": c["set_type"] in ("funny", "memorabilia"),
         })

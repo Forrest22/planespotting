@@ -9,6 +9,7 @@ void main() {
     'number': '49',
     'type': 'plane',
     'oracleText': 'Some text',
+    'artist': 'Jane Doe',
     'image': 'assets/cards/moc-49-esper.webp',
     'funny': false,
   };
@@ -18,6 +19,13 @@ void main() {
 
     expect(card.id, 'moc-49');
     expect(card.toJson(), json);
+  });
+
+  test('a missing artist reads as empty, and is written back as empty', () {
+    final card = PlanechaseCard.fromJson({...json}..remove('artist'));
+
+    expect(card.artist, isEmpty);
+    expect(card.toJson()['artist'], '');
   });
 
   test('fromJson throws FormatException for a missing or wrong-typed field', () {

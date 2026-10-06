@@ -30,6 +30,5 @@ Personally I found [this guide](https://docs.flutter.dev/get-started/install/lin
 
 Notes to self:
 
-- planar die
 - card browser (search, exclude cards)
 - custom cards?

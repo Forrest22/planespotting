@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:planespotting/data/repositories/card_repository.dart';
 import 'package:planespotting/data/repositories/settings_repository.dart';
 import 'package:planespotting/domain/models/planechase_card.dart';
+import 'package:planespotting/domain/planar_die.dart';
 
 /// A shuffled Planechase deck with swipe-back history.
 ///
@@ -32,10 +33,45 @@ class GameViewModel extends ChangeNotifier {
   int get index => _index;
   bool get hasCards => _history.isNotEmpty;
   bool get canGoBack => _index > 0;
-  PlanechaseCard? get current => hasCards ? _history[_index] : null;
+  /// The plane in play, or null until the game has started (see [start]).
+  PlanechaseCard? get current => hasCards && _started ? _history[_index] : null;
+
+  bool _started = false;
+
+  /// False until the first planeswalk reveals a card. The deck is already drawn by then.
+  bool get started => _started;
+
+  /// Reveals the first card.
+  void start() {
+    if (_started || !hasCards) return;
+    _started = true;
+    notifyListeners();
+  }
+
+  DieFace? _lastRoll;
+  int _rollCount = 0;
+
+  /// The result of the latest die roll on the current plane, if any.
+  DieFace? get lastRoll => _lastRoll;
+
+  /// Rolls so far, so the UI can tell two identical results in a row apart.
+  int get rollCount => _rollCount;
+
+  /// Draws a die result without recording it, so the UI can animate towards it first.
+  DieFace nextRoll() => rollPlanarDie(_random);
+
+  /// Records a roll: [result] if given (see [nextRoll]), otherwise a fresh one.
+  void rollDie([DieFace? result]) {
+    _lastRoll = result ?? rollPlanarDie(_random);
+    _rollCount++;
+    notifyListeners();
+  }
 
   void onPageChanged(int index) {
+    _started = true;
     _index = index;
+    // A result belongs to the plane it was rolled on.
+    _lastRoll = null;
     if (_index == _history.length - 1) _addUpcoming();
     notifyListeners();
   }
@@ -43,7 +79,7 @@ class GameViewModel extends ChangeNotifier {
   /// Re-reads the settings (e.g. after the Options screen). Keeps the cards
   /// already shown and redraws the upcoming one.
   void refresh() {
-    if (!hasCards) {
+    if (!hasCards || !_started) {
       _start();
     } else {
       _history.removeRange(_index + 1, _history.length);

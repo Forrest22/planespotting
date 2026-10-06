@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="512" height="512">
+  <!-- Small-size planeswalk face: a lens over a single card, with few, bold shapes so it stays crisp at ~44 px. Black ink only; the diamond is a real hole. Original artwork: cards-lens.svg. -->
+  <circle cx="40" cy="40" r="35" fill="none" stroke="#000" stroke-width="9"/>
+  <line x1="66" y1="66" x2="88" y2="88" stroke="#000" stroke-width="13" stroke-linecap="round"/>
+  <path fill="#000" fill-rule="evenodd" d="M26,19H54Q57,19 57,22V58Q57,61 54,61H26Q23,61 23,58V22Q23,19 26,19ZM40,26L51,40L40,54L29,40Z"/>
+</svg>

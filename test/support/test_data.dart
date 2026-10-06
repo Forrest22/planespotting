@@ -23,6 +23,7 @@ PlanechaseCard testCard(
     number: number,
     type: type,
     oracleText: 'Text for $name',
+    artist: 'Artist of $name',
     image: 'assets/cards/$set-$number.webp',
     funny: funny,
   );

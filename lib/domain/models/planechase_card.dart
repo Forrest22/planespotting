@@ -7,6 +7,9 @@ class PlanechaseCard {
   final String number;
   final CardType type;
   final String oracleText;
+
+  /// Empty when the card has no credited artist (e.g. Unknown Event cards).
+  final String artist;
   final String image;
   final bool funny;
 
@@ -17,6 +20,7 @@ class PlanechaseCard {
     required this.number,
     required this.type,
     required this.oracleText,
+    this.artist = '',
     required this.image,
     required this.funny,
   });
@@ -43,6 +47,7 @@ class PlanechaseCard {
           number: number,
           type: CardType.values.byName(type),
           oracleText: oracleText,
+          artist: json['artist'] as String? ?? '',
           image: image,
           funny: funny,
         ),
@@ -58,6 +63,7 @@ class PlanechaseCard {
       'number': number,
       'type': type.name,
       'oracleText': oracleText,
+      'artist': artist,
       'image': image,
       'funny': funny,
     };
