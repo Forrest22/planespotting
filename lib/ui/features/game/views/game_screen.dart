@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:planespotting/data/repositories/card_repository.dart';
 import 'package:planespotting/data/repositories/settings_repository.dart';
+import 'package:planespotting/data/services/screen_awake_service.dart';
 import 'package:planespotting/domain/models/planechase_card.dart';
 import 'package:planespotting/domain/planar_die.dart';
 import 'package:planespotting/routes.dart';
@@ -14,6 +15,9 @@ import 'package:planespotting/ui/features/game/view_models/game_view_model.dart'
 import 'package:planespotting/ui/features/game/views/planar_die_button.dart';
 
 const double _doubleTapZoom = 2.5;
+
+// How long the "Planeswalk!" banner shows before the automatic planeswalk.
+const Duration _autoPlaneswalkDelay = Duration(milliseconds: 1200);
 
 // Windows shorter than this (logical px) get the compact bottom bar.
 const double _compactWindowHeight = 520;
@@ -29,10 +33,12 @@ class GameScreen extends StatefulWidget {
     super.key,
     required this.cardRepository,
     required this.settingsRepository,
+    this.screenAwake = const ScreenAwakeService(),
   });
 
   final CardRepository cardRepository;
   final SettingsRepository settingsRepository;
+  final ScreenAwakeService screenAwake;
 
   @override
   State<GameScreen> createState() => _GameScreenState();
@@ -52,6 +58,7 @@ class _GameScreenState extends State<GameScreen>
     duration: const Duration(milliseconds: 1200),
   );
   final Random _flickerRandom = Random(); // cosmetic only, not the game's RNG
+  Timer? _autoPlaneswalk;
   List<DieFace> _flicker = const [];
 
   // Extra quarter turns added by the Rotate button, on top of the automatic fit.
@@ -66,17 +73,27 @@ class _GameScreenState extends State<GameScreen>
   @override
   void initState() {
     super.initState();
+    if (widget.settingsRepository.keepScreenOn) widget.screenAwake.enable();
     _zoom.addListener(() {
       final zoomed = _zoom.value.getMaxScaleOnAxis() > 1.01;
       if (zoomed != _zoomed) setState(() => _zoomed = zoomed);
     });
     _rollController.addStatusListener((status) {
-      if (status == AnimationStatus.completed) _viewModel.finishRoll();
+      if (status != AnimationStatus.completed) return;
+      final wasStarted = _viewModel.started;
+      _viewModel.finishRoll();
+      if (wasStarted &&
+          _viewModel.lastRoll == DieFace.planeswalk &&
+          widget.settingsRepository.autoPlaneswalk) {
+        _autoPlaneswalk = Timer(_autoPlaneswalkDelay, _next);
+      }
     });
   }
 
   @override
   void dispose() {
+    _autoPlaneswalk?.cancel();
+    widget.screenAwake.disable();
     _zoom.dispose();
     _pointers.dispose();
     _rollController.dispose();
@@ -108,6 +125,7 @@ class _GameScreenState extends State<GameScreen>
 
   void _roll() {
     if (!_viewModel.hasCards || _rollController.isAnimating) return;
+    _autoPlaneswalk?.cancel();
     // The result is decided up front so the flicker can end on it.
     final result = _viewModel.beginRoll();
     setState(() => _flicker = rollFlicker(result, _flickerRandom));
@@ -294,6 +312,7 @@ class _GameScreenState extends State<GameScreen>
                 : null,
         itemCount: history.length,
         onPageChanged: (page) {
+          _autoPlaneswalk?.cancel();
           _zoom.value = Matrix4.identity();
           _viewModel.onPageChanged(page);
         },

@@ -10,16 +10,22 @@ void main() {
     final defaults = await loadedSettingsRepository(cards);
     expect(defaults.enabledSets, {'moc', 'who'});
     expect(defaults.enabledTypes, CardType.values.toSet());
+    expect(defaults.keepScreenOn, isTrue);
+    expect(defaults.autoPlaneswalk, isTrue);
 
     final saved = await loadedSettingsRepository(cards, {
       'set_who': false,
       'set_punk': true,
       'type_phenomenon': false,
       'denylist': ['moc-49'],
+      'keep_screen_on': false,
+      'auto_planeswalk': false,
     });
     expect(saved.enabledSets, {'moc', 'punk'});
     expect(saved.enabledTypes, {CardType.plane});
     expect(saved.denylist, {'moc-49'});
+    expect(saved.keepScreenOn, isFalse);
+    expect(saved.autoPlaneswalk, isFalse);
   });
 
   test('changes notify, persist across a reload, and can be undone', () async {

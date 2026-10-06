@@ -6,6 +6,10 @@ import 'package:planespotting/ui/features/options/views/options_screen.dart';
 import '../support/test_data.dart';
 
 Future<SettingsRepository> pumpOptions(WidgetTester tester) async {
+  // Tall enough that the lazy list builds every section.
+  tester.view.physicalSize = const Size(800, 1200);
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.reset);
   final cards = await loadedCardRepository();
   final settings = await loadedSettingsRepository(cards);
   await tester.pumpWidget(MaterialApp(
@@ -24,6 +28,7 @@ void main() {
     expect(find.text('4 cards enabled'), findsOneWidget); // Sets: moc (2) + who (2)
     expect(find.text('0 cards enabled'), findsOneWidget); // Un-cards are off by default
     expect(find.text('5 cards enabled'), findsOneWidget); // Types: every card
+    expect(find.text('4 cards in the deck'), findsOneWidget); // enabled sets and types combined
   });
 
   testWidgets('unchecking a set updates the section total', (tester) async {
@@ -36,6 +41,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('2 cards enabled'), findsOneWidget);
+    expect(find.text('2 cards in the deck'), findsOneWidget);
   });
 
   testWidgets('excluded cards show a row that lowers the counts and can restore them all', (tester) async {
@@ -49,6 +55,7 @@ void main() {
     expect(find.text('1 card excluded individually'), findsOneWidget);
     expect(find.text('3 cards enabled'), findsOneWidget); // Sets: 4 minus the excluded one
     expect(find.text('4 cards enabled'), findsOneWidget); // Types: 5 minus the excluded one
+    expect(find.text('3 cards in the deck'), findsOneWidget);
 
     await tester.tap(find.text('Restore all'));
     await tester.pumpAndSettle();

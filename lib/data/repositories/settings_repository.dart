@@ -15,6 +15,11 @@ class SettingsRepository extends ChangeNotifier {
   final Map<String, bool> _sets = {};
   final Map<CardType, bool> _types = {};
   Set<String> _denylist = {};
+  bool _keepScreenOn = true;
+  bool _autoPlaneswalk = true;
+
+  /// Whether the screen stays awake during a game.
+  bool get keepScreenOn => _keepScreenOn;
 
   /// A read-only view of the excluded card ids (no copy). The set is replaced on every change,
   /// so a view taken earlier doesn't change underneath you.
@@ -30,6 +35,17 @@ class SettingsRepository extends ChangeNotifier {
       _types[type] = _service.getBool('type_${type.name}') ?? true;
     }
     _denylist = _service.getStringList('denylist').toSet();
+    _keepScreenOn = _service.getBool('keep_screen_on') ?? true;
+    _autoPlaneswalk = _service.getBool('auto_planeswalk') ?? true;
+  }
+
+  /// Whether a planeswalk roll moves to the next plane by itself.
+  bool get autoPlaneswalk => _autoPlaneswalk;
+
+  Future<void> setKeepScreenOn(bool value) async {
+    _keepScreenOn = value;
+    notifyListeners();
+    await _service.setBool('keep_screen_on', value);
   }
 
   bool isSetEnabled(String code) => _sets[code] ?? false;
@@ -50,6 +66,12 @@ class SettingsRepository extends ChangeNotifier {
     _sets[code] = enabled;
     notifyListeners();
     await _service.setBool('set_$code', enabled);
+  }
+
+  Future<void> setAutoPlaneswalk(bool value) async {
+    _autoPlaneswalk = value;
+    notifyListeners();
+    await _service.setBool('auto_planeswalk', value);
   }
 
   Future<void> setTypeEnabled(CardType type, bool enabled) async {

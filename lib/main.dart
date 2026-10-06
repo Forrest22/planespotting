@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:planespotting/about.dart';
+import 'package:planespotting/ui/features/about/views/about_screen.dart';
 import 'package:planespotting/data/repositories/card_repository.dart';
 import 'package:planespotting/data/repositories/settings_repository.dart';
 import 'package:planespotting/data/services/card_asset_service.dart';
@@ -29,6 +29,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      title: 'Planespotting',
       home: MenuScreen(),
       routes: {
         planeschaseStartRoute: (context) => GameScreen(
@@ -43,7 +44,7 @@ class MyApp extends StatelessWidget {
               cardRepository: cardRepository,
               settingsRepository: settingsRepository,
             ),
-        aboutRoute: (context) => AboutPage(),
+        aboutRoute: (context) => AboutScreen(),
       },
     );
   }

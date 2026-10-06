@@ -5,7 +5,11 @@ import 'package:planespotting/routes.dart';
 import 'package:planespotting/ui/features/options/view_models/options_view_model.dart';
 
 class OptionsScreen extends StatefulWidget {
-  const OptionsScreen({super.key, required this.cardRepository, required this.settingsRepository});
+  const OptionsScreen({
+    super.key,
+    required this.cardRepository,
+    required this.settingsRepository,
+  });
 
   final CardRepository cardRepository;
   final SettingsRepository settingsRepository;
@@ -40,13 +44,76 @@ class _OptionsScreenState extends State<OptionsScreen> {
           builder: (context, _) {
             return ListView(
               children: [
-                if (viewModel.excludedCount > 0) _ExcludedCardsTile(viewModel: viewModel),
-                for (final section in viewModel.sections) _SectionTile(section: section),
+                const _SectionHeader('Game'),
+                SwitchListTile(
+                  title: const Text('Planeswalk automatically'),
+                  subtitle: const Text(
+                    'Moves to the next plane after a planeswalk roll',
+                  ),
+                  value: viewModel.autoPlaneswalk,
+                  onChanged: viewModel.setAutoPlaneswalk,
+                ),
+                SwitchListTile(
+                  title: const Text('Keep screen on during a game'),
+                  value: viewModel.keepScreenOn,
+                  onChanged: viewModel.setKeepScreenOn,
+                ),
+                const SizedBox(height: 24),
+                const Divider(height: 1),
+                const _SectionHeader('Deck'),
+                _DeckTotalTile(count: viewModel.deckCount),
+                if (viewModel.excludedCount > 0)
+                  _ExcludedCardsTile(viewModel: viewModel),
+                for (final section in viewModel.sections)
+                  _SectionTile(section: section),
               ],
             );
           },
         ),
       ),
+    );
+  }
+}
+
+/// A label that groups the tiles below it.
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader(this.title);
+
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      // Roomy above (the gap between sections), tight below (the tiles it labels).
+      padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
+      child: Text(
+        title,
+        style: theme.textTheme.titleLarge?.copyWith(
+          color: theme.colorScheme.primary,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 1.2,
+        ),
+      ),
+    );
+  }
+}
+
+/// How many cards the game will draw from, across every setting and exclusion.
+class _DeckTotalTile extends StatelessWidget {
+  const _DeckTotalTile({required this.count});
+
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      title: Text(
+        '$count ${count == 1 ? 'card' : 'cards'} in the deck',
+        style: Theme.of(context).textTheme.titleMedium,
+      ),
+      subtitle:
+          count == 0 ? const Text('Turn on at least one set and type') : null,
     );
   }
 }
@@ -99,7 +166,9 @@ class _ExcludedCardsTile extends StatelessWidget {
       children: [
         ListTile(
           title: const Text('Excluded cards'),
-          subtitle: Text('$count ${count == 1 ? 'card' : 'cards'} excluded individually'),
+          subtitle: Text(
+            '$count ${count == 1 ? 'card' : 'cards'} excluded individually',
+          ),
         ),
         // Wraps onto two lines when there isn't room for both buttons side by side.
         Padding(
@@ -107,8 +176,14 @@ class _ExcludedCardsTile extends StatelessWidget {
           child: OverflowBar(
             alignment: MainAxisAlignment.end,
             children: [
-              TextButton(onPressed: () => Navigator.pushNamed(context, browserRoute), child: const Text('Browse')),
-              TextButton(onPressed: viewModel.restoreExcluded, child: const Text('Restore all')),
+              TextButton(
+                onPressed: () => Navigator.pushNamed(context, browserRoute),
+                child: const Text('Browse'),
+              ),
+              TextButton(
+                onPressed: viewModel.restoreExcluded,
+                child: const Text('Restore all'),
+              ),
             ],
           ),
         ),
