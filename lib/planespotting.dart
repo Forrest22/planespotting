@@ -1,11 +1,8 @@
 import 'dart:convert';
 import 'dart:math';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:planespotting/options.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 class PlaneschasingStartPage extends StatefulWidget {
   const PlaneschasingStartPage({super.key});
@@ -63,7 +60,7 @@ class PlaneschasingStartPageState extends State<PlaneschasingStartPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text("Planeschasing")),
+      appBar: AppBar(title: Text("Planeschasing View")),
       body: Stack(
         children: [
           Center(

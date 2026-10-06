@@ -36,7 +36,7 @@ class MenuScreen extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             MenuButton(text: 'Start', onPressed: () => Navigator.pushNamed(context, planeschaseStartRoute), isMain: true),
-            // MenuButton(text: 'Options', onPressed: () => Navigator.pushNamed(context, optionsRoute)),
+            MenuButton(text: 'Options', onPressed: () => Navigator.pushNamed(context, optionsRoute)),
             MenuButton(text: 'About', onPressed: () => Navigator.pushNamed(context, aboutRoute)),
           ],
         ),
