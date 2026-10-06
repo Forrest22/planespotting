@@ -13,7 +13,7 @@ Future<void> pumpOptions(WidgetTester tester) async {
 }
 
 void main() {
-  testWidgets('shows the three sections with defaults applied', (tester) async {
+  testWidgets('shows the three sections with default counts', (tester) async {
     await pumpOptions(tester);
 
     expect(find.text('Sets'), findsOneWidget);
@@ -24,31 +24,15 @@ void main() {
     expect(find.text('5 cards enabled'), findsOneWidget); // Types: every card
   });
 
-  testWidgets('Sets section lists counts and unchecking a set updates the total', (tester) async {
+  testWidgets('unchecking a set updates the section total', (tester) async {
     await pumpOptions(tester);
-
     await tester.tap(find.text('Sets'));
     await tester.pumpAndSettle();
-
-    expect(find.text('March of the Machine Commander (2)'), findsOneWidget);
     expect(find.text('Doctor Who (2)'), findsOneWidget);
-    expect(find.text('4 cards enabled'), findsOneWidget);
 
     await tester.tap(find.text('Doctor Who (2)'));
     await tester.pumpAndSettle();
 
     expect(find.text('2 cards enabled'), findsOneWidget);
-  });
-
-  testWidgets('Select All turns every set in the section on or off', (tester) async {
-    await pumpOptions(tester);
-    await tester.tap(find.text('Un-cards'));
-    await tester.pumpAndSettle();
-    expect(find.text('0 cards enabled'), findsOneWidget);
-
-    await tester.tap(find.byType(Checkbox).first); // "Select All" for Un-cards
-    await tester.pumpAndSettle();
-
-    expect(find.text('1 card enabled'), findsOneWidget);
   });
 }

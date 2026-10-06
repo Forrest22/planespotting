@@ -4,7 +4,7 @@ import 'package:planespotting/data/repositories/card_repository.dart';
 import 'package:planespotting/data/repositories/settings_repository.dart';
 import 'package:planespotting/data/services/card_asset_service.dart';
 import 'package:planespotting/data/services/settings_service.dart';
-import 'package:planespotting/planespotting.dart';
+import 'package:planespotting/ui/features/game/views/game_screen.dart';
 import 'package:planespotting/ui/features/options/views/options_screen.dart';
 import 'routes.dart';
 
@@ -30,7 +30,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       home: MenuScreen(),
       routes: {
-        planeschaseStartRoute: (context) => PlaneschasingStartPage(
+        planeschaseStartRoute: (context) => GameScreen(
               cardRepository: cardRepository,
               settingsRepository: settingsRepository,
             ),

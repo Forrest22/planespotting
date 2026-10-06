@@ -30,6 +30,6 @@ Personally I found [this guide](https://docs.flutter.dev/get-started/install/lin
 
 Notes to self:
 
-- padding to the UI
-- swipe to go next and back
-- pinch to zoom
+- planar die
+- card browser (search, exclude cards)
+- custom cards?

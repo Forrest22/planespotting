@@ -13,28 +13,15 @@ void main() {
     'funny': false,
   };
 
-  test('fromJson parses every field', () {
+  test('fromJson/toJson round-trip and expose the card id', () {
     final card = PlanechaseCard.fromJson(json);
 
-    expect(card.name, 'Esper');
-    expect(card.type, CardType.plane);
-    expect(card.funny, isFalse);
     expect(card.id, 'moc-49');
+    expect(card.toJson(), json);
   });
 
-  test('toJson round-trips', () {
-    expect(PlanechaseCard.fromJson(json).toJson(), json);
-  });
-
-  test('fromJson throws FormatException when a field is missing', () {
-    final bad = Map<String, dynamic>.of(json)..remove('oracleText');
-
-    expect(() => PlanechaseCard.fromJson(bad), throwsFormatException);
-  });
-
-  test('fromJson throws FormatException when a field has the wrong type', () {
-    final bad = Map<String, dynamic>.of(json)..['funny'] = 'no';
-
-    expect(() => PlanechaseCard.fromJson(bad), throwsFormatException);
+  test('fromJson throws FormatException for a missing or wrong-typed field', () {
+    expect(() => PlanechaseCard.fromJson({...json}..remove('oracleText')), throwsFormatException);
+    expect(() => PlanechaseCard.fromJson({...json, 'funny': 'no'}), throwsFormatException);
   });
 }

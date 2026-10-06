@@ -1,46 +1,64 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:planespotting/domain/models/planechase_card.dart';
-import 'package:planespotting/planespotting.dart';
-import 'package:planespotting/routes.dart';
+import 'package:planespotting/ui/features/game/views/game_screen.dart';
 
 import '../support/test_data.dart';
 
+Future<void> pumpGame(WidgetTester tester) async {
+  final cards = await loadedCardRepository();
+  final settings = await loadedSettingsRepository(cards);
+  await tester.pumpWidget(MaterialApp(
+    home: GameScreen(cardRepository: cards, settingsRepository: settings),
+  ));
+}
+
+String currentTitle(WidgetTester tester) {
+  final title = find.descendant(of: find.byType(AppBar), matching: find.byType(Text)).first;
+  return tester.widget<Text>(title).data!;
+}
+
 void main() {
-  testWidgets('shows a card from the enabled sets only', (tester) async {
-    // Only one eligible card, so the pick is deterministic.
-    final cards = await loadedCardRepository();
-    final settings = await loadedSettingsRepository(cards, {
-      'set_moc': false,
-      'set_who': true,
-      'type_phenomenon': false,
-      'denylist': ['who-566'],
-    });
+  testWidgets('Next shows another card and Back returns to the first', (tester) async {
+    await pumpGame(tester);
+    final first = currentTitle(tester);
+    expect(tester.widget<IconButton>(find.widgetWithIcon(IconButton, Icons.arrow_back)).onPressed, isNull);
 
-    await tester.pumpWidget(MaterialApp(
-      home: PlaneschasingStartPage(cardRepository: cards, settingsRepository: settings),
-    ));
+    await tester.tap(find.byTooltip('Next card'));
+    await tester.pumpAndSettle();
+    expect(currentTitle(tester), isNot(first));
 
-    final image = tester.widget<Image>(find.byType(Image));
-    expect((image.image as AssetImage).assetName, 'assets/cards/who-600.webp');
-    expect(find.text('No cards match your options'), findsNothing);
+    await tester.tap(find.byTooltip('Previous card'));
+    await tester.pumpAndSettle();
+    expect(currentTitle(tester), first);
   });
 
-  testWidgets('shows an empty state with a link to Options when nothing matches', (tester) async {
-    final cards = await loadedCardRepository([testCard('Esper', type: CardType.plane)]);
-    final settings = await loadedSettingsRepository(cards, {'set_moc': false});
+  testWidgets('Text button opens a sheet that fits its text and stays on screen', (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(400, 800);
+    addTearDown(tester.view.reset);
+    await pumpGame(tester);
+    final name = currentTitle(tester);
 
-    await tester.pumpWidget(MaterialApp(
-      routes: {optionsRoute: (context) => const Text('options page')},
-      home: PlaneschasingStartPage(cardRepository: cards, settingsRepository: settings),
-    ));
-
-    expect(find.text('No cards match your options'), findsOneWidget);
-    expect(find.byType(Image), findsNothing);
-
-    await tester.tap(find.text('Open Options'));
+    await tester.tap(find.byTooltip('Card text'));
     await tester.pumpAndSettle();
 
-    expect(find.text('options page'), findsOneWidget);
+    expect(find.text(name), findsWidgets);
+    expect(find.text('Text for $name'), findsWidgets);
+    final sheet = tester.getRect(find.byType(BottomSheet));
+    expect(sheet.bottom, lessThanOrEqualTo(800));
+    expect(sheet.height, lessThan(400)); // short text: the sheet wraps it instead of filling the screen
+  });
+
+  testWidgets('turns the card upright in a wide window and leaves it tall in a narrow one', (tester) async {
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    tester.view.physicalSize = const Size(400, 800);
+    await pumpGame(tester);
+    expect(tester.widget<RotatedBox>(find.byType(RotatedBox).first).quarterTurns, 0);
+
+    tester.view.physicalSize = const Size(800, 400);
+    await tester.pumpAndSettle();
+    expect(tester.widget<RotatedBox>(find.byType(RotatedBox).first).quarterTurns, 1);
   });
 }
