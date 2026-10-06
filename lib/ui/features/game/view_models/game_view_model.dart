@@ -57,12 +57,22 @@ class GameViewModel extends ChangeNotifier {
   /// Rolls so far, so the UI can tell two identical results in a row apart.
   int get rollCount => _rollCount;
 
-  /// Draws a die result without recording it, so the UI can animate towards it first.
-  DieFace nextRoll() => rollPlanarDie(_random);
+  DieFace? _pendingRoll;
 
-  /// Records a roll: [result] if given (see [nextRoll]), otherwise a fresh one.
-  void rollDie([DieFace? result]) {
-    _lastRoll = result ?? rollPlanarDie(_random);
+  /// Starts a roll and returns the face it will land on, so the UI can animate towards it.
+  /// The very first roll is always a planeswalk: it reveals the opening plane.
+  DieFace beginRoll() => _pendingRoll = _started ? rollPlanarDie(_random) : DieFace.planeswalk;
+
+  /// Lands the roll begun with [beginRoll]. Does nothing if none is pending.
+  void finishRoll() {
+    final result = _pendingRoll;
+    if (result == null) return;
+    _pendingRoll = null;
+    if (!_started) {
+      start();
+      return;
+    }
+    _lastRoll = result;
     _rollCount++;
     notifyListeners();
   }

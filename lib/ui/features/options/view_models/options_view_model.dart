@@ -6,12 +6,16 @@ import 'package:planespotting/domain/models/planechase_card.dart';
 class OptionItem {
   final String label;
   final int count;
+
+  /// Cards still in play: [count] minus the ones excluded one by one in the browser.
+  final int activeCount;
   final bool enabled;
   final ValueChanged<bool> onChanged;
 
   const OptionItem({
     required this.label,
     required this.count,
+    required this.activeCount,
     required this.enabled,
     required this.onChanged,
   });
@@ -27,7 +31,7 @@ class OptionSection {
   bool get allEnabled => items.every((item) => item.enabled);
 
   /// Cards covered by the enabled options in this section.
-  int get enabledCardCount => items.where((item) => item.enabled).fold(0, (sum, item) => sum + item.count);
+  int get enabledCardCount => items.where((item) => item.enabled).fold(0, (sum, item) => sum + item.activeCount);
 }
 
 class OptionsViewModel extends ChangeNotifier {
@@ -39,6 +43,14 @@ class OptionsViewModel extends ChangeNotifier {
 
   final CardRepository _cards;
   final SettingsRepository _settings;
+
+  /// Cards excluded one by one in the browser.
+  int get excludedCount => _settings.denylist.length;
+
+  Future<void> restoreExcluded() => _settings.clearExcluded();
+
+  int _activeWhere(bool Function(PlanechaseCard card) test) =>
+      _cards.cards.where((card) => test(card) && !_settings.isExcluded(card.id)).length;
 
   List<OptionSection> get sections {
     final sets = _cards.sets;
@@ -52,6 +64,7 @@ class OptionsViewModel extends ChangeNotifier {
             OptionItem(
               label: _typeLabel(type),
               count: _cards.countOfType(type),
+              activeCount: _activeWhere((card) => card.type == type),
               enabled: _settings.isTypeEnabled(type),
               onChanged: (value) => _settings.setTypeEnabled(type, value),
             ),
@@ -74,6 +87,7 @@ class OptionsViewModel extends ChangeNotifier {
           OptionItem(
             label: set.name,
             count: _cards.countInSet(set.code),
+            activeCount: _activeWhere((card) => card.set == set.code),
             enabled: _settings.isSetEnabled(set.code),
             onChanged: (value) => _settings.setSetEnabled(set.code, value),
           ),

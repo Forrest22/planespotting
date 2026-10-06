@@ -1,3 +1,5 @@
+import 'dart:collection';
+
 import 'package:flutter/foundation.dart';
 import 'package:planespotting/data/repositories/card_repository.dart';
 import 'package:planespotting/data/services/settings_service.dart';
@@ -14,7 +16,11 @@ class SettingsRepository extends ChangeNotifier {
   final Map<CardType, bool> _types = {};
   Set<String> _denylist = {};
 
-  Set<String> get denylist => Set.unmodifiable(_denylist);
+  /// A read-only view of the excluded card ids (no copy). The set is replaced on every change,
+  /// so a view taken earlier doesn't change underneath you.
+  Set<String> get denylist => UnmodifiableSetView(_denylist);
+
+  bool isExcluded(String cardId) => _denylist.contains(cardId);
 
   Future<void> load(List<CardSet> sets) async {
     for (final set in sets) {
@@ -50,6 +56,26 @@ class SettingsRepository extends ChangeNotifier {
     _types[type] = enabled;
     notifyListeners();
     await _service.setBool('type_${type.name}', enabled);
+  }
+
+  /// Puts every individually excluded card back into play.
+  Future<void> clearExcluded() async {
+    _denylist = {};
+    notifyListeners();
+    await _service.setStringList('denylist', const []);
+  }
+
+  /// Excludes or includes many cards at once: one update, one notification, one save.
+  Future<void> setCardsExcluded(Iterable<String> cardIds, bool excluded) async {
+    final updated = {..._denylist};
+    if (excluded) {
+      updated.addAll(cardIds);
+    } else {
+      updated.removeAll(cardIds);
+    }
+    _denylist = updated;
+    notifyListeners();
+    await _service.setStringList('denylist', _denylist.toList());
   }
 
   Future<void> setCardExcluded(String cardId, bool excluded) async {

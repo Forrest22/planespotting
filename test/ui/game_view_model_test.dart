@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:planespotting/domain/planar_die.dart';
 import 'package:planespotting/ui/features/game/view_models/game_view_model.dart';
 
 import '../support/test_data.dart';
@@ -50,24 +51,27 @@ void main() {
     expect(viewModel.current, same(viewModel.history.first));
   });
 
-  test('rolling the die sets the result, and a page change clears it', () async {
+  test('the first roll is a planeswalk that starts the game; later rolls set the result and clear on a page change', () async {
     final cards = await loadedCardRepository();
     final settings = await loadedSettingsRepository(cards);
     final viewModel = GameViewModel(cardRepository: cards, settingsRepository: settings, random: Random(1));
 
-    expect(viewModel.lastRoll, isNull);
-    viewModel.rollDie();
-    expect(viewModel.lastRoll, isNotNull);
+    expect(viewModel.beginRoll(), DieFace.planeswalk);
+    viewModel.finishRoll();
+    expect(viewModel.started, isTrue);
+    expect(viewModel.lastRoll, isNull); // the opening roll reveals a card; it isn't a result to show
+    expect(viewModel.rollCount, 0);
+
+    final result = viewModel.beginRoll();
+    expect(viewModel.lastRoll, isNull); // nothing lands until the roll finishes
+    viewModel.finishRoll();
+    expect(viewModel.lastRoll, result);
     expect(viewModel.rollCount, 1);
 
-    // A result drawn ahead of time (so the animation can land on it) is recorded as given.
-    final drawn = viewModel.nextRoll();
-    viewModel.rollDie(drawn);
-    expect(viewModel.lastRoll, drawn);
-    expect(viewModel.rollCount, 2);
+    viewModel.finishRoll(); // nothing pending: no change
+    expect(viewModel.rollCount, 1);
 
     viewModel.onPageChanged(1);
     expect(viewModel.lastRoll, isNull);
-    expect(viewModel.rollCount, 2);
   });
 }

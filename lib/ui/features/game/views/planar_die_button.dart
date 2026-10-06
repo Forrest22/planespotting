@@ -113,6 +113,7 @@ class PlanarDieButton extends StatelessWidget {
   const PlanarDieButton({
     super.key,
     required this.face,
+    this.size = 64,
     required this.rolling,
     required this.flicker,
     required this.onRoll,
@@ -120,6 +121,9 @@ class PlanarDieButton extends StatelessWidget {
 
   /// The face at rest.
   final DieFace? face;
+
+  /// Width and height of the button.
+  final double size;
   final AnimationController rolling;
   final List<DieFace> flicker;
   final VoidCallback onRoll;
@@ -132,7 +136,7 @@ class PlanarDieButton extends StatelessWidget {
     );
     // Bigger than the default FAB, because the faces are detailed.
     return FloatingActionButtonTheme(
-      data: const FloatingActionButtonThemeData(largeSizeConstraints: BoxConstraints.tightFor(width: 64, height: 64)),
+      data: FloatingActionButtonThemeData(largeSizeConstraints: BoxConstraints.tightFor(width: size, height: size)),
       child: FloatingActionButton.large(
         tooltip: 'Roll planar die',
         backgroundColor: _dieColor,
@@ -149,7 +153,7 @@ class PlanarDieButton extends StatelessWidget {
             }
             return AnimatedSwitcher(
               duration: const Duration(milliseconds: 60),
-              child: PlanarDieGlyph(key: ValueKey(shown), face: shown, size: 56),
+              child: PlanarDieGlyph(key: ValueKey(shown), face: shown, size: size - 8),
             );
           },
         ),

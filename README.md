@@ -30,5 +30,4 @@ Personally I found [this guide](https://docs.flutter.dev/get-started/install/lin
 
 Notes to self:
 
-- card browser (search, exclude cards)
 - custom cards?

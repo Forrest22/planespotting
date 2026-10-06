@@ -25,6 +25,9 @@ class PlanechaseCard {
     required this.funny,
   });
 
+  /// A small copy of [image] (made by `tool/fetch_cards.py`) for lists and grids.
+  String get thumbnail => image.replaceFirst('assets/cards/', 'assets/cards_thumb/');
+
   /// Stable identifier, used by the denylist.
   String get id => '$set-$number';
 

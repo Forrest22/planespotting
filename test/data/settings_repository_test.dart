@@ -40,4 +40,19 @@ void main() {
     expect(reloaded.enabledTypes, {CardType.plane});
     expect(reloaded.denylist, {'moc-49'});
   });
+
+  test('clearExcluded empties the denylist, notifies, and persists', () async {
+    final cards = await loadedCardRepository();
+    final settings = await loadedSettingsRepository(cards, {
+      'denylist': ['moc-49', 'who-600'],
+    });
+    var notifications = 0;
+    settings.addListener(() => notifications++);
+
+    await settings.clearExcluded();
+
+    expect(settings.denylist, isEmpty);
+    expect(notifications, 1);
+    expect((await loadedSettingsRepositoryFromExisting(cards)).denylist, isEmpty);
+  });
 }

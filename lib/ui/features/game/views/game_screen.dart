@@ -5,15 +5,24 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:planespotting/data/repositories/card_repository.dart';
 import 'package:planespotting/data/repositories/settings_repository.dart';
-import 'package:planespotting/domain/formatting.dart';
 import 'package:planespotting/domain/models/planechase_card.dart';
 import 'package:planespotting/domain/planar_die.dart';
 import 'package:planespotting/routes.dart';
 import 'package:planespotting/ui/core/card_image.dart';
+import 'package:planespotting/ui/core/card_text_panel.dart';
 import 'package:planespotting/ui/features/game/view_models/game_view_model.dart';
 import 'package:planespotting/ui/features/game/views/planar_die_button.dart';
 
 const double _doubleTapZoom = 2.5;
+
+// Windows shorter than this (logical px) get the compact bottom bar.
+const double _compactWindowHeight = 520;
+
+// In a window at least this wide (and wider than tall) the card text sits beside the card.
+const double _sidePanelMinWidth = 600;
+const double _sidePanelWidthFraction = 0.35;
+const double _sidePanelMinPanelWidth = 300;
+const double _sidePanelMaxPanelWidth = 420;
 
 class GameScreen extends StatefulWidget {
   const GameScreen({
@@ -44,14 +53,14 @@ class _GameScreenState extends State<GameScreen>
   );
   final Random _flickerRandom = Random(); // cosmetic only, not the game's RNG
   List<DieFace> _flicker = const [];
-  DieFace _pendingResult = DieFace.blank;
 
   // Extra quarter turns added by the Rotate button, on top of the automatic fit.
   int _extraTurns = 0;
   // The card-text sheet is a mode: once on, every card shows its text.
   bool _textVisible = false;
   bool _zoomed = false;
-  int _pointers = 0;
+  // Fingers on the screen; two or more means a pinch, which must not turn the page.
+  final ValueNotifier<int> _pointers = ValueNotifier(0);
   Offset _doubleTapPosition = Offset.zero;
 
   @override
@@ -62,17 +71,14 @@ class _GameScreenState extends State<GameScreen>
       if (zoomed != _zoomed) setState(() => _zoomed = zoomed);
     });
     _rollController.addStatusListener((status) {
-      if (status != AnimationStatus.completed) return;
-      // The first roll is a planeswalk that reveals the opening plane.
-      _viewModel.started
-          ? _viewModel.rollDie(_pendingResult)
-          : _viewModel.start();
+      if (status == AnimationStatus.completed) _viewModel.finishRoll();
     });
   }
 
   @override
   void dispose() {
     _zoom.dispose();
+    _pointers.dispose();
     _rollController.dispose();
     _pageController.dispose();
     _viewModel.dispose();
@@ -93,15 +99,18 @@ class _GameScreenState extends State<GameScreen>
 
   void _next() {
     if (!_viewModel.hasCards) return;
-    _viewModel.started ? _goTo(_viewModel.index + 1) : _viewModel.start();
+    if (_viewModel.started) {
+      _goTo(_viewModel.index + 1);
+    } else {
+      _viewModel.start();
+    }
   }
 
   void _roll() {
     if (!_viewModel.hasCards || _rollController.isAnimating) return;
-    // Decide the result up front so the flicker can end on it.
-    _pendingResult =
-        _viewModel.started ? _viewModel.nextRoll() : DieFace.planeswalk;
-    setState(() => _flicker = rollFlicker(_pendingResult, _flickerRandom));
+    // The result is decided up front so the flicker can end on it.
+    final result = _viewModel.beginRoll();
+    setState(() => _flicker = rollFlicker(result, _flickerRandom));
     _rollController.forward(from: 0);
   }
 
@@ -161,33 +170,71 @@ class _GameScreenState extends State<GameScreen>
                       ? _buildStartPrompt(context)
                       : LayoutBuilder(
                         builder:
-                            (context, constraints) => Stack(
-                              children: [
-                                _buildPages(),
-                                // Grows up out of the bottom bar.
-                                Positioned(
-                                  left: 0,
-                                  right: 0,
-                                  bottom: 0,
-                                  child: _buildTextSheet(
-                                    card,
-                                    constraints.maxHeight * 0.6,
-                                  ),
-                                ),
-                                Positioned(
-                                  top: 8,
-                                  left: 12,
-                                  right: 12,
-                                  child: _buildBanner(),
-                                ),
-                              ],
-                            ),
+                            (context, constraints) =>
+                                _buildGame(constraints, card),
                       ),
               bottomNavigationBar: !hasCards ? null : _buildActionBar(card),
             );
           },
         ),
       ),
+    );
+  }
+
+  /// The card pages and the card text. In a wide window the text gets its own panel beside
+  /// the card, which shrinks to make room; otherwise it is a sheet over the card's bottom.
+  Widget _buildGame(BoxConstraints constraints, PlanechaseCard card) {
+    final pages = Stack(
+      children: [
+        _buildPages(),
+        Positioned(top: 8, left: 12, right: 12, child: _buildBanner()),
+      ],
+    );
+    final wide =
+        constraints.maxWidth >= _sidePanelMinWidth &&
+        constraints.maxWidth > constraints.maxHeight;
+    if (!wide) {
+      return Stack(
+        children: [
+          pages,
+          // Grows up out of the bottom bar.
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: _buildTextSheet(card, constraints.maxHeight * 0.6),
+          ),
+        ],
+      );
+    }
+    final panelWidth = (constraints.maxWidth * _sidePanelWidthFraction).clamp(
+      _sidePanelMinPanelWidth,
+      _sidePanelMaxPanelWidth,
+    );
+    return Row(
+      children: [
+        Expanded(child: pages),
+        // Grows in from the right edge; the card re-fits as it does.
+        AnimatedSize(
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeInOut,
+          alignment: Alignment.centerRight,
+          child:
+              _textVisible
+                  ? SizedBox(
+                    width: panelWidth,
+                    height: constraints.maxHeight,
+                    child: CardTextPanel(
+                      key: const ValueKey('card-text-panel'),
+                      card: card,
+                      borderRadius: const BorderRadius.horizontal(
+                        left: Radius.circular(20),
+                      ),
+                    ),
+                  )
+                  : const SizedBox.shrink(),
+        ),
+      ],
     );
   }
 
@@ -232,14 +279,17 @@ class _GameScreenState extends State<GameScreen>
   Widget _buildPages() {
     final history = _viewModel.history;
     return Listener(
-      onPointerDown: (_) => setState(() => _pointers++),
-      onPointerUp: (_) => setState(() => _pointers--),
-      onPointerCancel: (_) => setState(() => _pointers--),
-      child: PageView.builder(
+      onPointerDown: (_) => _pointers.value++,
+      onPointerUp: (_) => _pointers.value--,
+      onPointerCancel: (_) => _pointers.value--,
+      // Only the page view reacts to the finger count, not the whole screen.
+      child: ValueListenableBuilder<int>(
+        valueListenable: _pointers,
+        builder: (context, pointers, _) => PageView.builder(
         controller: _pageController,
         // One-finger drags pan a zoomed card, and pinching must not turn the page.
         physics:
-            _zoomed || _pointers > 1
+            _zoomed || pointers > 1
                 ? const NeverScrollableScrollPhysics()
                 : null,
         itemCount: history.length,
@@ -274,6 +324,7 @@ class _GameScreenState extends State<GameScreen>
             ),
           );
         },
+      ),
       ),
     );
   }
@@ -342,7 +393,7 @@ class _GameScreenState extends State<GameScreen>
                       if (velocity < -300) _next();
                       if (velocity > 300) _back();
                     },
-                    child: _CardTextPanel(
+                    child: CardTextPanel(
                       key: const ValueKey('card-text-panel'),
                       card: card,
                     ),
@@ -354,8 +405,10 @@ class _GameScreenState extends State<GameScreen>
   }
 
   Widget _buildActionBar(PlanechaseCard? card) {
+    // In a short window (e.g. a phone on its side) the bar shrinks to leave the card room.
+    final compact = MediaQuery.sizeOf(context).height < _compactWindowHeight;
     return BottomAppBar(
-      height: 116,
+      height: compact ? 72 : 116,
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
@@ -379,10 +432,12 @@ class _GameScreenState extends State<GameScreen>
                     _viewModel.started
                         ? _viewModel.lastRoll
                         : DieFace.planeswalk,
+                size: compact ? 48 : 64,
                 rolling: _rollController,
                 flicker: _flicker,
                 onRoll: _roll,
               ),
+              if (!compact)
               ExcludeSemantics(
                 child: InkWell(
                   onTap: _roll,
@@ -537,64 +592,6 @@ class _RollBannerState extends State<_RollBanner> {
                 ],
               ),
             ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// The card's name, type line, rules text and artist, on a sheet attached to the bottom bar.
-class _CardTextPanel extends StatelessWidget {
-  const _CardTextPanel({super.key, required this.card});
-
-  final PlanechaseCard card;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context).textTheme;
-    final colors = Theme.of(context).colorScheme;
-    final kind = card.type == CardType.plane ? 'Plane' : 'Phenomenon';
-    return Material(
-      elevation: 6,
-      // Rounded on top only: the bottom edge sits flush on the bar.
-      borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-      color: colors.surface.withValues(alpha: 0.96),
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 200),
-          child: Column(
-            key: ValueKey(card.id),
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(card.name, style: theme.titleLarge),
-              const SizedBox(height: 4),
-              Text(
-                '$kind · ${card.setName} · ${card.number}',
-                style: theme.labelLarge,
-              ),
-              const SizedBox(height: 12),
-              // Full width so the text lines up whatever its length.
-              SizedBox(
-                width: double.infinity,
-                child: Text(
-                  formatOracleText(card.oracleText),
-                  style: theme.bodyLarge,
-                ),
-              ),
-              if (card.artist.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                Text(
-                  'Illustrated by ${card.artist}',
-                  style: theme.bodySmall?.copyWith(
-                    fontStyle: FontStyle.italic,
-                    color: colors.onSurfaceVariant,
-                  ),
-                ),
-              ],
-            ],
           ),
         ),
       ),
