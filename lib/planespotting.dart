@@ -1,11 +1,16 @@
-import 'dart:convert';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:planespotting/data/repositories/card_repository.dart';
+import 'package:planespotting/data/repositories/settings_repository.dart';
+import 'package:planespotting/domain/models/planechase_card.dart';
+import 'package:planespotting/routes.dart';
 
 class PlaneschasingStartPage extends StatefulWidget {
-  const PlaneschasingStartPage({super.key});
+  const PlaneschasingStartPage({super.key, required this.cardRepository, required this.settingsRepository});
+
+  final CardRepository cardRepository;
+  final SettingsRepository settingsRepository;
 
   @override
   PlaneschasingStartPageState createState() => PlaneschasingStartPageState();
@@ -14,29 +19,19 @@ class PlaneschasingStartPage extends StatefulWidget {
 class PlaneschasingStartPageState extends State<PlaneschasingStartPage> {
   bool _isExpanded = false;
 
-  // Example image URL or asset
-  String _imagePath = "loading";
+  PlanechaseCard? _card;
 
-  // Function to handle reroll (change the image path or do any logic)
-  void _reroll() async {
-    // Logic to change the image (or randomize)
-    // 1. Get options
-    // savedOptions = getSavedOptions()
+  // Picks a random card from the cards allowed by the saved options.
+  void _reroll() {
+    final settings = widget.settingsRepository;
+    final candidates = widget.cardRepository.filter(
+      enabledSets: settings.enabledSets,
+      enabledTypes: settings.enabledTypes,
+      denylist: settings.denylist,
+    );
 
-    // 2. Get potential cards
-    final images = json.decode(await rootBundle.loadString('AssetManifest.json')).keys
-    .where((String key) => key.contains('assets/planeschase/'))
-    .toList();
-
-    // 3. Randomly pick one
-    int min = 0;
-    int max = images.length-1;
-    var rand = Random();
-    int r = min + rand.nextInt(max - min);
-    String imageName  = images[r].toString();
-    
     setState(() {
-      _imagePath = imageName; // Update with new image
+      _card = candidates.isEmpty ? null : candidates[Random().nextInt(candidates.length)];
     });
   }
 
@@ -64,10 +59,26 @@ class PlaneschasingStartPageState extends State<PlaneschasingStartPage> {
       body: Stack(
         children: [
           Center(
-            child: (_imagePath == "loading")? CircularProgressIndicator() : Transform.rotate(
-              angle: _imageRotation * 3.14159 / 180, // Rotate image based on angle
-              child: Image.asset(_imagePath), // Display image
-            ),
+            child: _card == null
+                ? Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text('No cards match your options'),
+                      const SizedBox(height: 12),
+                      ElevatedButton(
+                        onPressed: () => Navigator.pushNamed(context, optionsRoute).then((_) => _reroll()),
+                        child: const Text('Open Options'),
+                      ),
+                    ],
+                  )
+                : Transform.rotate(
+                    angle: _imageRotation * 3.14159 / 180, // Rotate image based on angle
+                    child: Image.asset(
+                      _card!.image,
+                      // Falls back to text if the image wasn't downloaded (see tool/fetch_cards.py).
+                      errorBuilder: (context, error, stackTrace) => _MissingImage(card: _card!),
+                    ),
+                  ),
           ),
           Positioned(
             bottom: 20,
@@ -106,6 +117,27 @@ class PlaneschasingStartPageState extends State<PlaneschasingStartPage> {
                     ),
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MissingImage extends StatelessWidget {
+  const _MissingImage({required this.card});
+
+  final PlanechaseCard card;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(24.0),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(card.name, style: Theme.of(context).textTheme.headlineSmall),
+          const SizedBox(height: 12),
+          Text(card.oracleText, style: Theme.of(context).textTheme.bodyLarge),
         ],
       ),
     );
