@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:planespotting/ui/core/ui_constants.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 const String _appName = 'Planespotting';
@@ -37,14 +38,10 @@ class _AboutScreenState extends State<AboutScreen> {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('About'),
-        backgroundColor: Colors.deepPurple,
-        foregroundColor: Colors.white,
-      ),
+      appBar: AppBar(title: const Text('About')),
       body: Center(
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 600),
+          constraints: const BoxConstraints(maxWidth: contentMaxWidth),
           child: ListView(
             padding: const EdgeInsets.all(24),
             children: [
@@ -58,8 +55,9 @@ class _AboutScreenState extends State<AboutScreen> {
                 builder: (context, snapshot) {
                   final info = snapshot.data;
                   return Text(
+                    // A space while loading keeps the line's height, so nothing jumps.
                     info == null
-                        ? ''
+                        ? ' '
                         : 'Version ${info.version} (${info.buildNumber})',
                     style: textTheme.bodyMedium,
                     textAlign: TextAlign.center,
@@ -92,7 +90,8 @@ class _AboutScreenState extends State<AboutScreen> {
                 ),
               ),
               const SizedBox(height: 8),
-              Center(
+              Align(
+                alignment: Alignment.centerLeft,
                 child: OutlinedButton(
                   onPressed: () async {
                     final info = await _info;

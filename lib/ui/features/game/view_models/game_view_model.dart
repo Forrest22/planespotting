@@ -63,18 +63,20 @@ class GameViewModel extends ChangeNotifier {
   /// The very first roll is always a planeswalk: it reveals the opening plane.
   DieFace beginRoll() => _pendingRoll = _started ? rollPlanarDie(_random) : DieFace.planeswalk;
 
-  /// Lands the roll begun with [beginRoll]. Does nothing if none is pending.
-  void finishRoll() {
+  /// Lands the roll begun with [beginRoll] and returns the face it landed on. Returns null when
+  /// nothing was pending, or for the opening roll, which only reveals the first plane.
+  DieFace? finishRoll() {
     final result = _pendingRoll;
-    if (result == null) return;
+    if (result == null) return null;
     _pendingRoll = null;
     if (!_started) {
       start();
-      return;
+      return null;
     }
     _lastRoll = result;
     _rollCount++;
     notifyListeners();
+    return result;
   }
 
   void onPageChanged(int index) {

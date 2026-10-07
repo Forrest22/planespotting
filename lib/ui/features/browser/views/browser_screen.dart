@@ -5,7 +5,11 @@ import 'package:flutter/rendering.dart' show ScrollCacheExtent;
 import 'package:planespotting/data/repositories/card_repository.dart';
 import 'package:planespotting/data/repositories/settings_repository.dart';
 import 'package:planespotting/domain/models/planechase_card.dart';
+import 'package:planespotting/ui/core/card_border.dart';
 import 'package:planespotting/ui/core/card_image.dart';
+import 'package:planespotting/ui/core/empty_state.dart';
+import 'package:planespotting/ui/core/exclude_toggle.dart';
+import 'package:planespotting/ui/core/ui_constants.dart';
 import 'package:planespotting/ui/features/browser/view_models/browser_view_model.dart';
 import 'package:planespotting/ui/features/browser/views/card_viewer_screen.dart';
 
@@ -148,7 +152,7 @@ class _BrowserScreenState extends State<BrowserScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('${exclude ? 'Exclude' : 'Include'} $count ${count == 1 ? 'card' : 'cards'}?'),
+        title: Text('${exclude ? 'Exclude' : 'Include'} ${cardCount(count)}?'),
         content: Text(
           exclude
               ? "They won't come up in games. Include them again here, or with Restore all in Options."
@@ -156,7 +160,7 @@ class _BrowserScreenState extends State<BrowserScreen> {
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-          TextButton(onPressed: () => Navigator.pop(context, true), child: Text(exclude ? 'Exclude' : 'Include')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: Text(exclude ? 'Exclude' : 'Include')),
         ],
       ),
     );
@@ -173,8 +177,6 @@ class _BrowserScreenState extends State<BrowserScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Browse cards'),
-        backgroundColor: Colors.deepPurple,
-        foregroundColor: Colors.white,
         actions: [
           ListenableBuilder(
             listenable: _viewModel,
@@ -233,7 +235,7 @@ class _BrowserScreenState extends State<BrowserScreen> {
                 child: Align(
                   alignment: Alignment.centerLeft,
                   child: Text(
-                    '${entries.length} ${entries.length == 1 ? 'card' : 'cards'} · '
+                    '${cardCount(entries.length)} · '
                     'Filters only. Turn sets on or off in Options.',
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
@@ -275,17 +277,11 @@ class _BrowserScreenState extends State<BrowserScreen> {
   }
 
   Widget _buildEmpty() {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Text('No cards match'),
-          if (_viewModel.hasActiveFilters) ...[
-            const SizedBox(height: 12),
-            ElevatedButton(onPressed: _clearFilters, child: const Text('Clear filters')),
-          ],
-        ],
-      ),
+    return EmptyState(
+      icon: Icons.search_off,
+      message: 'No cards match',
+      actionLabel: _viewModel.hasActiveFilters ? 'Clear filters' : null,
+      onAction: _clearFilters,
     );
   }
 
@@ -346,7 +342,7 @@ class _CardTile extends StatelessWidget {
           value: excluded ? 'Excluded' : (hidden ? 'Set or type is off' : null),
           child: InkWell(
             onTap: onOpen,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(8),
             child: Column(
               children: [
                 // The file is portrait with the card printed sideways: turn it upright.
@@ -360,9 +356,9 @@ class _CardTile extends StatelessWidget {
                           aspectRatio: _cardAspectRatio,
                           child: DecoratedBox(
                             key: const ValueKey('image-placeholder'),
-                            decoration: BoxDecoration(
+                            decoration: ShapeDecoration(
                               color: colors.surfaceContainerHighest,
-                              borderRadius: BorderRadius.circular(12),
+                              shape: const CardBorder(),
                             ),
                           ),
                         ),
@@ -419,7 +415,7 @@ class _ExcludeButton extends StatelessWidget {
     return Semantics(
       button: true,
       excludeSemantics: true,
-      label: excluded ? 'Include in game' : 'Exclude from game',
+      label: excludeLabel(excluded),
       onTap: onPressed,
       child: Material(
         color: colors.secondaryContainer,
@@ -429,7 +425,7 @@ class _ExcludeButton extends StatelessWidget {
           onTap: onPressed,
           child: Padding(
             padding: const EdgeInsets.all(8),
-            child: Icon(excluded ? Icons.undo : Icons.block, size: 18, color: colors.onSecondaryContainer),
+            child: Icon(excludeIcon(excluded), size: 18, color: colors.onSecondaryContainer),
           ),
         ),
       ),

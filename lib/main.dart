@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:planespotting/ui/features/about/views/about_screen.dart';
 import 'package:planespotting/data/repositories/card_repository.dart';
 import 'package:planespotting/data/repositories/settings_repository.dart';
 import 'package:planespotting/data/services/card_asset_service.dart';
 import 'package:planespotting/data/services/settings_service.dart';
+import 'package:planespotting/ui/core/theme.dart';
 import 'package:planespotting/ui/features/browser/views/browser_screen.dart';
 import 'package:planespotting/ui/features/game/views/game_screen.dart';
 import 'package:planespotting/ui/features/options/views/options_screen.dart';
@@ -30,6 +32,9 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Planespotting',
+      theme: appTheme(Brightness.light),
+      darkTheme: appTheme(Brightness.dark),
+      themeMode: ThemeMode.system,
       home: MenuScreen(),
       routes: {
         planeschaseStartRoute: (context) => GameScreen(
@@ -50,13 +55,35 @@ class MyApp extends StatelessWidget {
   }
 }
 
+/// The magnifying-glass-over-cards artwork (also the launcher icon), tinted to the theme.
+class _MenuLogo extends StatelessWidget {
+  const _MenuLogo();
+
+  @override
+  Widget build(BuildContext context) {
+    // Smaller in a short window (e.g. a phone on its side) to leave room for the buttons.
+    final size = MediaQuery.sizeOf(context).height < 520 ? 80.0 : 120.0;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: SvgPicture.asset(
+        'assets/die/cards-lens.svg',
+        width: size,
+        height: size,
+        excludeFromSemantics: true, // decoration
+        colorFilter: ColorFilter.mode(Theme.of(context).colorScheme.primary, BlendMode.srcIn),
+        errorBuilder: (context, error, stackTrace) => const SizedBox.shrink(),
+      ),
+    );
+  }
+}
+
 class MenuScreen extends StatelessWidget {
   const MenuScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Planespotting'), backgroundColor: Colors.deepPurple, foregroundColor: Colors.white),
+      appBar: AppBar(title: const Text('Planespotting')),
       // Scrolls when the window is short (or the text is large), instead of overflowing.
       body: Stack(
         children: [
@@ -66,6 +93,7 @@ class MenuScreen extends StatelessWidget {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  const _MenuLogo(),
                   MenuButton(text: 'Start', onPressed: () => Navigator.pushNamed(context, planeschaseStartRoute), isMain: true),
                   MenuButton(text: 'Browse cards', onPressed: () => Navigator.pushNamed(context, browserRoute)),
                   MenuButton(text: 'Options', onPressed: () => Navigator.pushNamed(context, optionsRoute)),
@@ -123,14 +151,10 @@ class MenuButton extends StatelessWidget {
         constraints: const BoxConstraints(maxWidth: 300),
         child: SizedBox(
           width: double.infinity,
-          child: ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: isMain ? Colors.deepPurpleAccent : null,
-              foregroundColor: isMain ? Colors.white : null,
-            ),
-            onPressed: onPressed,
-            child: Text(text),
-          ),
+          // The main action is a solid button; the others are a quieter tonal shade.
+          child: isMain
+              ? FilledButton(onPressed: onPressed, child: Text(text))
+              : FilledButton.tonal(onPressed: onPressed, child: Text(text)),
         ),
       )
     );

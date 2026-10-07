@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:planespotting/domain/formatting.dart';
 import 'package:planespotting/domain/models/planechase_card.dart';
+import 'package:planespotting/ui/core/ui_constants.dart';
 
 /// The card's name, type line, rules text and artist, on a sheet attached to the bottom bar
 /// (or, with a different [borderRadius], a side panel).
@@ -8,7 +9,7 @@ class CardTextPanel extends StatelessWidget {
   const CardTextPanel({
     super.key,
     required this.card,
-    this.borderRadius = const BorderRadius.vertical(top: Radius.circular(20)),
+    this.borderRadius = const BorderRadius.vertical(top: Radius.circular(panelRadius)),
   });
 
   final PlanechaseCard card;

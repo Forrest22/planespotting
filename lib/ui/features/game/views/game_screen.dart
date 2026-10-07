@@ -9,8 +9,11 @@ import 'package:planespotting/data/services/screen_awake_service.dart';
 import 'package:planespotting/domain/models/planechase_card.dart';
 import 'package:planespotting/domain/planar_die.dart';
 import 'package:planespotting/routes.dart';
-import 'package:planespotting/ui/core/card_image.dart';
+import 'package:planespotting/ui/core/app_bar_title.dart';
 import 'package:planespotting/ui/core/card_text_panel.dart';
+import 'package:planespotting/ui/core/empty_state.dart';
+import 'package:planespotting/ui/core/ui_constants.dart';
+import 'package:planespotting/ui/core/zoomable_card.dart';
 import 'package:planespotting/ui/features/game/view_models/game_view_model.dart';
 import 'package:planespotting/ui/features/game/views/planar_die_button.dart';
 
@@ -34,11 +37,15 @@ class GameScreen extends StatefulWidget {
     required this.cardRepository,
     required this.settingsRepository,
     this.screenAwake = const ScreenAwakeService(),
+    this.random,
   });
 
   final CardRepository cardRepository;
   final SettingsRepository settingsRepository;
   final ScreenAwakeService screenAwake;
+
+  /// The game's randomness (shuffle and die), so a test can fix it. Real games leave it null.
+  final Random? random;
 
   @override
   State<GameScreen> createState() => _GameScreenState();
@@ -49,9 +56,10 @@ class _GameScreenState extends State<GameScreen>
   late final GameViewModel _viewModel = GameViewModel(
     cardRepository: widget.cardRepository,
     settingsRepository: widget.settingsRepository,
+    random: widget.random,
   );
   final PageController _pageController = PageController();
-  final TransformationController _zoom = TransformationController();
+  final CardZoomController _zoom = CardZoomController();
   // The die flashes through faces, then lands on the result.
   late final AnimationController _rollController = AnimationController(
     vsync: this,
@@ -65,7 +73,6 @@ class _GameScreenState extends State<GameScreen>
   int _extraTurns = 0;
   // The card-text sheet is a mode: once on, every card shows its text.
   bool _textVisible = false;
-  bool _zoomed = false;
   // Fingers on the screen; two or more means a pinch, which must not turn the page.
   final ValueNotifier<int> _pointers = ValueNotifier(0);
   Offset _doubleTapPosition = Offset.zero;
@@ -74,20 +81,20 @@ class _GameScreenState extends State<GameScreen>
   void initState() {
     super.initState();
     if (widget.settingsRepository.keepScreenOn) widget.screenAwake.enable();
-    _zoom.addListener(() {
-      final zoomed = _zoom.value.getMaxScaleOnAxis() > 1.01;
-      if (zoomed != _zoomed) setState(() => _zoomed = zoomed);
-    });
-    _rollController.addStatusListener((status) {
-      if (status != AnimationStatus.completed) return;
-      final wasStarted = _viewModel.started;
-      _viewModel.finishRoll();
-      if (wasStarted &&
-          _viewModel.lastRoll == DieFace.planeswalk &&
-          widget.settingsRepository.autoPlaneswalk) {
-        _autoPlaneswalk = Timer(_autoPlaneswalkDelay, _next);
-      }
-    });
+    // Rebuilds only when the card crosses between zoomed in and not.
+    _zoom.zoomed.addListener(() => setState(() {}));
+    _rollController.addStatusListener(_onRollStatus);
+  }
+
+  // A named method rather than a closure, so a hot reload picks up edits to it.
+  void _onRollStatus(AnimationStatus status) {
+    if (status != AnimationStatus.completed) return;
+    final landed = _viewModel.finishRoll();
+    // The banner stays up for a moment, so the player sees the planeswalk before the plane changes.
+    if (landed == DieFace.planeswalk && widget.settingsRepository.autoPlaneswalk) {
+      _autoPlaneswalk?.cancel();
+      _autoPlaneswalk = Timer(_autoPlaneswalkDelay, _next);
+    }
   }
 
   @override
@@ -133,8 +140,8 @@ class _GameScreenState extends State<GameScreen>
   }
 
   void _toggleZoom() {
-    if (_zoomed) {
-      _zoom.value = Matrix4.identity();
+    if (_zoom.isZoomed) {
+      _zoom.reset();
     } else {
       // Zoom about the tapped point.
       final p = _doubleTapPosition;
@@ -152,6 +159,21 @@ class _GameScreenState extends State<GameScreen>
 
   void _toggleText() => setState(() => _textVisible = !_textVisible);
 
+  Future<void> _confirmLeave() async {
+    final leave = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Leave game?'),
+        content: const Text('The current plane and history will be lost.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Leave')),
+        ],
+      ),
+    );
+    if (leave == true && mounted) Navigator.pop(context);
+  }
+
   @override
   Widget build(BuildContext context) {
     return CallbackShortcuts(
@@ -167,19 +189,17 @@ class _GameScreenState extends State<GameScreen>
           builder: (context, _) {
             final card = _viewModel.current;
             final hasCards = _viewModel.hasCards;
-            return Scaffold(
+            return PopScope(
+              // Once a card is showing, going back asks first, since the history would be lost.
+              canPop: !_viewModel.started,
+              onPopInvokedWithResult: (didPop, _) {
+                if (!didPop) _confirmLeave();
+              },
+              child: Scaffold(
               appBar: AppBar(
                 // Slimmer than the default 56 px to leave more room for the card.
                 toolbarHeight: 44,
-                // Large by default; long names scale down to fit instead of truncating.
-                title: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    card?.name ?? 'Planeschasing',
-                    style: Theme.of(context).textTheme.headlineSmall,
-                  ),
-                ),
+                title: AppBarTitle(card?.name ?? 'Planespotting'),
               ),
               body:
                   !hasCards
@@ -192,6 +212,7 @@ class _GameScreenState extends State<GameScreen>
                                 _buildGame(constraints, card),
                       ),
               bottomNavigationBar: !hasCards ? null : _buildActionBar(card),
+              ),
             );
           },
         ),
@@ -246,7 +267,7 @@ class _GameScreenState extends State<GameScreen>
                       key: const ValueKey('card-text-panel'),
                       card: card,
                       borderRadius: const BorderRadius.horizontal(
-                        left: Radius.circular(20),
+                        left: Radius.circular(panelRadius),
                       ),
                     ),
                   )
@@ -275,22 +296,11 @@ class _GameScreenState extends State<GameScreen>
   }
 
   Widget _buildEmpty(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Text('No cards match your options'),
-          const SizedBox(height: 12),
-          ElevatedButton(
-            onPressed:
-                () => Navigator.pushNamed(
-                  context,
-                  optionsRoute,
-                ).then((_) => _viewModel.refresh()),
-            child: const Text('Open Options'),
-          ),
-        ],
-      ),
+    return EmptyState(
+      icon: Icons.filter_alt_off,
+      message: 'No cards match your options',
+      actionLabel: 'Open Options',
+      onAction: () => Navigator.pushNamed(context, optionsRoute).then((_) => _viewModel.refresh()),
     );
   }
 
@@ -307,42 +317,22 @@ class _GameScreenState extends State<GameScreen>
         controller: _pageController,
         // One-finger drags pan a zoomed card, and pinching must not turn the page.
         physics:
-            _zoomed || pointers > 1
+            _zoom.isZoomed || pointers > 1
                 ? const NeverScrollableScrollPhysics()
                 : null,
         itemCount: history.length,
         onPageChanged: (page) {
           _autoPlaneswalk?.cancel();
-          _zoom.value = Matrix4.identity();
+          _zoom.reset();
           _viewModel.onPageChanged(page);
         },
-        itemBuilder: (context, page) {
-          return Padding(
-            padding: const EdgeInsets.all(12),
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                // The card file is portrait with sideways text: fill a tall window as-is,
-                // and turn it upright in a wide one.
-                final autoTurns =
-                    constraints.maxWidth > constraints.maxHeight ? 1 : 0;
-                return GestureDetector(
-                  onDoubleTapDown:
-                      (details) => _doubleTapPosition = details.localPosition,
-                  onDoubleTap: _toggleZoom,
-                  child: InteractiveViewer(
-                    transformationController: _zoom,
-                    maxScale: 4,
-                    panEnabled: _zoomed,
-                    child: CardImage(
-                      card: history[page],
-                      quarterTurns: (autoTurns + _extraTurns) % 4,
-                    ),
-                  ),
-                );
-              },
-            ),
-          );
-        },
+        itemBuilder: (context, page) => ZoomableCard(
+          card: history[page],
+          controller: _zoom,
+          extraTurns: _extraTurns,
+          onDoubleTapDown: (details) => _doubleTapPosition = details.localPosition,
+          onDoubleTap: _toggleZoom,
+        ),
       ),
       ),
     );
@@ -402,7 +392,7 @@ class _GameScreenState extends State<GameScreen>
                 alignment: Alignment.bottomCenter,
                 child: ConstrainedBox(
                   constraints: BoxConstraints(
-                    maxWidth: 600,
+                    maxWidth: contentMaxWidth,
                     maxHeight: maxHeight,
                   ),
                   // The sheet covers the pages, so it passes swipes on to them.
@@ -560,7 +550,7 @@ class _RollBannerState extends State<_RollBanner> {
           liveRegion: true,
           child: Material(
             elevation: 8,
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(panelRadius),
             color: container,
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),

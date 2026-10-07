@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:planespotting/data/repositories/card_repository.dart';
 import 'package:planespotting/data/repositories/settings_repository.dart';
 import 'package:planespotting/routes.dart';
+import 'package:planespotting/ui/core/ui_constants.dart';
 import 'package:planespotting/ui/features/options/view_models/options_view_model.dart';
 
 class OptionsScreen extends StatefulWidget {
@@ -33,16 +34,15 @@ class _OptionsScreenState extends State<OptionsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Options'),
-        backgroundColor: Colors.deepPurple,
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: ListenableBuilder(
+      appBar: AppBar(title: const Text('Options')),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: contentMaxWidth),
+          child: ListenableBuilder(
           listenable: viewModel,
           builder: (context, _) {
             return ListView(
+              padding: const EdgeInsets.symmetric(vertical: 8),
               children: [
                 const _SectionHeader('Game'),
                 SwitchListTile(
@@ -69,6 +69,7 @@ class _OptionsScreenState extends State<OptionsScreen> {
               ],
             );
           },
+          ),
         ),
       ),
     );
@@ -107,13 +108,15 @@ class _DeckTotalTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    // An empty deck can't be played, so it reads as a warning.
+    final empty = count == 0;
     return ListTile(
-      title: Text(
-        '$count ${count == 1 ? 'card' : 'cards'} in the deck',
-        style: Theme.of(context).textTheme.titleMedium,
-      ),
-      subtitle:
-          count == 0 ? const Text('Turn on at least one set and type') : null,
+      leading: empty ? Icon(Icons.warning_amber_rounded, color: theme.colorScheme.error) : null,
+      title: Text('${cardCount(count)} in the deck', style: theme.textTheme.titleMedium),
+      subtitle: empty
+          ? Text('Turn on at least one set and type', style: TextStyle(color: theme.colorScheme.error))
+          : null,
     );
   }
 }
@@ -129,18 +132,13 @@ class _SectionTile extends StatelessWidget {
     return ExpansionTile(
       title: Text(section.title),
       subtitle: Text(
-        '${section.enabledCardCount} ${section.enabledCardCount == 1 ? 'card' : 'cards'} enabled',
+        '${cardCount(section.enabledCardCount)} enabled',
       ),
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.end,
-          children: [
-            Checkbox(
-              value: section.allEnabled,
-              onChanged: (value) => section.onSetAll(value ?? false),
-            ),
-            const Text('Select All'),
-          ],
+        CheckboxListTile(
+          title: const Text('Select all'),
+          value: section.allEnabled,
+          onChanged: (value) => section.onSetAll(value ?? false),
         ),
         for (final item in section.items)
           CheckboxListTile(
@@ -159,6 +157,17 @@ class _ExcludedCardsTile extends StatelessWidget {
 
   final OptionsViewModel viewModel;
 
+  Future<void> _restore(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final restored = await viewModel.restoreExcluded();
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text('${cardCount(restored.length)} restored'),
+        action: SnackBarAction(label: 'Undo', onPressed: () => viewModel.undoRestore(restored)),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final count = viewModel.excludedCount;
@@ -166,9 +175,7 @@ class _ExcludedCardsTile extends StatelessWidget {
       children: [
         ListTile(
           title: const Text('Excluded cards'),
-          subtitle: Text(
-            '$count ${count == 1 ? 'card' : 'cards'} excluded individually',
-          ),
+          subtitle: Text('${cardCount(count)} excluded individually'),
         ),
         // Wraps onto two lines when there isn't room for both buttons side by side.
         Padding(
@@ -178,10 +185,10 @@ class _ExcludedCardsTile extends StatelessWidget {
             children: [
               TextButton(
                 onPressed: () => Navigator.pushNamed(context, browserRoute),
-                child: const Text('Browse'),
+                child: const Text('Browse cards'),
               ),
               TextButton(
-                onPressed: viewModel.restoreExcluded,
+                onPressed: () => _restore(context),
                 child: const Text('Restore all'),
               ),
             ],

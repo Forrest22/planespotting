@@ -6,22 +6,29 @@ import 'package:planespotting/domain/planar_die.dart';
 const String planeswalkFaceAsset = 'assets/die/planeswalk_small.svg';
 const String chaosFaceAsset = 'assets/die/chaos_small.svg';
 
-// The die stays light in dark mode too, so the black artwork stays readable.
-const Color _dieColor = Color(0xFFF3EAD3);
-const Color _dieInk = Color(0xFF2B2A28);
+// One spec for the die, so the button and the start-screen face are drawn alike. The body is the
+// theme's primary container, with on-primary-container ink and a primary outline, in light and dark.
+double _dieRadius(double size) => size * 0.22;
+double _dieBorder(double size) => (size / 32).clamp(1.5, 3.0);
+// Whole pixels, so the artwork's edges land on pixel boundaries and stay crisp.
+double _dieInset(double size) => (size / 12).roundToDouble();
+// What is left for the glyph inside the die's border and inset.
+double _dieGlyphSize(double size) => size - 2 * _dieInset(size) - 2 * _dieBorder(size);
 
 /// What is printed on a die face: the SVG, a letter if it can't be loaded, or nothing for a blank.
 class PlanarDieGlyph extends StatelessWidget {
-  const PlanarDieGlyph({super.key, required this.face, this.size = 32, this.color = _dieInk});
+  const PlanarDieGlyph({super.key, required this.face, this.size = 32, this.color});
 
   final DieFace? face;
   final double size;
 
-  /// The ink colour. The artwork is single-colour, so it can be tinted to suit its background.
-  final Color color;
+  /// The ink colour, by default the theme's on-primary-container (the die's own ink). The artwork
+  /// is single-colour, so it can be tinted to suit its background.
+  final Color? color;
 
   @override
   Widget build(BuildContext context) {
+    final color = this.color ?? Theme.of(context).colorScheme.onPrimaryContainer;
     final (asset, letter, label) = switch (face) {
       DieFace.planeswalk => (planeswalkFaceAsset, 'P', 'Planeswalk'),
       DieFace.chaos => (chaosFaceAsset, 'C', 'Chaos'),
@@ -79,29 +86,26 @@ class _NaughtPainter extends CustomPainter {
   bool shouldRepaint(_NaughtPainter oldDelegate) => oldDelegate.color != color;
 }
 
-/// A small die face for the result banner and the start screen.
+/// A die face drawn as a die: the start screen's resting face. The banner uses just the symbol.
 class PlanarDieFace extends StatelessWidget {
   const PlanarDieFace({super.key, required this.face, this.size = 56});
 
   final DieFace? face;
   final double size;
 
-  static const double _border = 2;
-
   @override
   Widget build(BuildContext context) {
-    // Whole pixels all round, so the artwork's edges land on pixel boundaries and stay crisp.
-    final padding = (size / 12).roundToDouble();
+    final scheme = Theme.of(context).colorScheme;
     return Container(
       width: size,
       height: size,
-      padding: EdgeInsets.all(padding),
+      padding: EdgeInsets.all(_dieInset(size)),
       decoration: BoxDecoration(
-        color: _dieColor,
-        border: Border.all(color: _dieInk, width: _border),
-        borderRadius: BorderRadius.circular(size * 0.22),
+        color: scheme.primaryContainer,
+        border: Border.all(color: scheme.primary, width: _dieBorder(size)),
+        borderRadius: BorderRadius.circular(_dieRadius(size)),
       ),
-      child: PlanarDieGlyph(face: face, size: size - 2 * padding - 2 * _border),
+      child: PlanarDieGlyph(face: face, size: _dieGlyphSize(size)),
     );
   }
 }
@@ -130,17 +134,18 @@ class PlanarDieButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     final shape = RoundedRectangleBorder(
-      side: const BorderSide(color: _dieInk, width: 2.5),
-      borderRadius: BorderRadius.circular(20),
+      side: BorderSide(color: scheme.primary, width: _dieBorder(size)),
+      borderRadius: BorderRadius.circular(_dieRadius(size)),
     );
     // Bigger than the default FAB, because the faces are detailed.
     return FloatingActionButtonTheme(
       data: FloatingActionButtonThemeData(largeSizeConstraints: BoxConstraints.tightFor(width: size, height: size)),
       child: FloatingActionButton.large(
-        tooltip: 'Roll planar die',
-        backgroundColor: _dieColor,
-        foregroundColor: _dieInk,
+        tooltip: 'Roll die',
+        backgroundColor: scheme.primaryContainer,
+        foregroundColor: scheme.onPrimaryContainer,
         shape: shape,
         onPressed: onRoll,
         child: AnimatedBuilder(
@@ -153,7 +158,7 @@ class PlanarDieButton extends StatelessWidget {
             }
             return AnimatedSwitcher(
               duration: const Duration(milliseconds: 60),
-              child: PlanarDieGlyph(key: ValueKey(shown), face: shown, size: size - 8),
+              child: PlanarDieGlyph(key: ValueKey(shown), face: shown, size: _dieGlyphSize(size)),
             );
           },
         ),

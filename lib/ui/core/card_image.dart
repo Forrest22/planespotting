@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:planespotting/domain/models/planechase_card.dart';
+import 'package:planespotting/ui/core/card_border.dart';
 
 /// A card image with rounded corners and a soft shadow.
 ///
@@ -66,12 +67,12 @@ class CardImage extends StatelessWidget {
       quarterTurns: quarterTurns,
       child: Center(
         child: DecoratedBox(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: shadow ? const [BoxShadow(color: Colors.black26, blurRadius: 8, offset: Offset(0, 4))] : null,
+          decoration: ShapeDecoration(
+            shape: const CardBorder(),
+            shadows: shadow ? const [BoxShadow(color: Colors.black26, blurRadius: 8, offset: Offset(0, 4))] : null,
           ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(12),
+          child: ClipPath(
+            clipper: ShapeBorderClipper(shape: const CardBorder()),
             child: thumbnail
                 ? _asset(card.thumbnail, (context, error, stackTrace) => _asset(card.image, _missing))
                 : _asset(card.image, _missing),

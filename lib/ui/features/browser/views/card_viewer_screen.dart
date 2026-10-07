@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:planespotting/domain/models/planechase_card.dart';
-import 'package:planespotting/ui/core/card_image.dart';
+import 'package:planespotting/ui/core/app_bar_title.dart';
 import 'package:planespotting/ui/core/card_text_panel.dart';
+import 'package:planespotting/ui/core/exclude_toggle.dart';
+import 'package:planespotting/ui/core/ui_constants.dart';
+import 'package:planespotting/ui/core/zoomable_card.dart';
 import 'package:planespotting/ui/features/browser/view_models/browser_view_model.dart';
 
 /// One card full screen, with its text and artist. Swipe to move through [cards].
@@ -27,17 +30,14 @@ class CardViewerScreen extends StatefulWidget {
 
 class _CardViewerScreenState extends State<CardViewerScreen> {
   late final PageController _pages = PageController(initialPage: widget.initialIndex);
-  final TransformationController _zoom = TransformationController();
+  final CardZoomController _zoom = CardZoomController();
   late int _index = widget.initialIndex;
-  bool _zoomed = false;
 
   @override
   void initState() {
     super.initState();
-    _zoom.addListener(() {
-      final zoomed = _zoom.value.getMaxScaleOnAxis() > 1.01;
-      if (zoomed != _zoomed) setState(() => _zoomed = zoomed);
-    });
+    // Rebuilds only when the card crosses between zoomed in and not.
+    _zoom.zoomed.addListener(() => setState(() {}));
   }
 
   @override
@@ -56,13 +56,11 @@ class _CardViewerScreenState extends State<CardViewerScreen> {
         final excluded = widget.viewModel.isExcluded(card);
         return Scaffold(
           appBar: AppBar(
-            title: Text(card.name),
-            backgroundColor: Colors.deepPurple,
-            foregroundColor: Colors.white,
+            title: AppBarTitle(card.name),
             actions: [
               IconButton(
-                tooltip: excluded ? 'Include in game' : 'Exclude from game',
-                icon: Icon(excluded ? Icons.undo : Icons.block),
+                tooltip: excludeLabel(excluded),
+                icon: Icon(excludeIcon(excluded)),
                 onPressed: () => widget.viewModel.toggleExcluded(card),
               ),
             ],
@@ -73,33 +71,19 @@ class _CardViewerScreenState extends State<CardViewerScreen> {
                 child: PageView.builder(
                   controller: _pages,
                   // A zoomed card pans with one finger instead of turning the page.
-                  physics: _zoomed ? const NeverScrollableScrollPhysics() : null,
+                  physics: _zoom.isZoomed ? const NeverScrollableScrollPhysics() : null,
                   itemCount: widget.cards.length,
                   onPageChanged: (page) {
-                    _zoom.value = Matrix4.identity();
+                    _zoom.reset();
                     setState(() => _index = page);
                     widget.onIndexChanged?.call(page);
                   },
-                  itemBuilder: (context, page) => Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: LayoutBuilder(
-                      builder: (context, constraints) => InteractiveViewer(
-                        transformationController: _zoom,
-                        maxScale: 4,
-                        panEnabled: _zoomed,
-                        // Tall window: the file as is. Wide window: turned upright.
-                        child: CardImage(
-                          card: widget.cards[page],
-                          quarterTurns: constraints.maxWidth > constraints.maxHeight ? 1 : 0,
-                        ),
-                      ),
-                    ),
-                  ),
+                  itemBuilder: (context, page) => ZoomableCard(card: widget.cards[page], controller: _zoom),
                 ),
               ),
               ConstrainedBox(
                 constraints: BoxConstraints(
-                  maxWidth: 600,
+                  maxWidth: contentMaxWidth,
                   maxHeight: MediaQuery.sizeOf(context).height * 0.4,
                 ),
                 child: CardTextPanel(card: card),

@@ -60,7 +60,15 @@ class OptionsViewModel extends ChangeNotifier {
   /// Cards excluded one by one in the browser.
   int get excludedCount => _settings.denylist.length;
 
-  Future<void> restoreExcluded() => _settings.clearExcluded();
+  /// Puts every individually excluded card back, and returns the ones it restored.
+  Future<Set<String>> restoreExcluded() async {
+    final restored = {..._settings.denylist};
+    await _settings.clearExcluded();
+    return restored;
+  }
+
+  /// Excludes the cards [restoreExcluded] put back.
+  Future<void> undoRestore(Set<String> cardIds) => _settings.setCardsExcluded(cardIds, true);
 
   int _activeWhere(bool Function(PlanechaseCard card) test) =>
       _cards.cards.where((card) => test(card) && !_settings.isExcluded(card.id)).length;
