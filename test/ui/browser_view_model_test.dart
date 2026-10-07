@@ -58,13 +58,19 @@ void main() {
     expect(settings.denylist, {'moc-49'});
     expect(viewModel.isExcluded(esper), isTrue);
     expect(viewModel.isInPlay(esper), isFalse);
-    expect(viewModel.isHiddenByOptions(esper), isFalse); // excluded on its own, not by Options
+    expect(viewModel.isOutOfDeck(esper), isFalse); // excluded on its own, not by Options
 
     viewModel.setExcludedOnly(true);
     expect(names(viewModel), ['Esper']);
 
+    viewModel.setIncludedOnly(true); // turns Excluded only off
+    expect(viewModel.excludedOnly, isFalse);
+    expect(names(viewModel), ['Chaotic Aether', 'TARDIS Bay', "Amy's Home"]); // in play: not Esper, not the Un-card
+
     await viewModel.toggleExcluded(esper);
     expect(settings.denylist, isEmpty);
+    viewModel.setExcludedOnly(true);
+    expect(viewModel.includedOnly, isFalse);
     expect(viewModel.entries, isEmpty);
   });
 
@@ -74,7 +80,7 @@ void main() {
     final viewModel = BrowserViewModel(cardRepository: cards, settingsRepository: settings);
     final bean = cards.cards.firstWhere((card) => card.set == 'punk'); // Un-sets default to off
 
-    expect(viewModel.isHiddenByOptions(bean), isTrue);
+    expect(viewModel.isOutOfDeck(bean), isTrue);
     expect(viewModel.isInPlay(bean), isFalse);
     expect(viewModel.isExcluded(bean), isFalse);
 

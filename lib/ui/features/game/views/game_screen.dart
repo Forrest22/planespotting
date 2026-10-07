@@ -298,9 +298,9 @@ class _GameScreenState extends State<GameScreen>
   Widget _buildEmpty(BuildContext context) {
     return EmptyState(
       icon: Icons.filter_alt_off,
-      message: 'No cards match your options',
-      actionLabel: 'Open Options',
-      onAction: () => Navigator.pushNamed(context, optionsRoute).then((_) => _viewModel.refresh()),
+      message: 'No cards in the deck',
+      actionLabel: 'Choose cards',
+      onAction: () => Navigator.pushNamed(context, browserRoute).then((_) => _viewModel.refresh()),
     );
   }
 

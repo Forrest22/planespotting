@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:planespotting/domain/models/planechase_card.dart';
 import 'package:planespotting/ui/core/app_bar_title.dart';
 import 'package:planespotting/ui/core/card_text_panel.dart';
@@ -29,7 +30,9 @@ class CardViewerScreen extends StatefulWidget {
 }
 
 class _CardViewerScreenState extends State<CardViewerScreen> {
-  late final PageController _pages = PageController(initialPage: widget.initialIndex);
+  late final PageController _pages = PageController(
+    initialPage: widget.initialIndex,
+  );
   final CardZoomController _zoom = CardZoomController();
   late int _index = widget.initialIndex;
 
@@ -47,6 +50,19 @@ class _CardViewerScreenState extends State<CardViewerScreen> {
     super.dispose();
   }
 
+  static const _pageDuration = Duration(milliseconds: 250);
+
+  void _turn(int delta) {
+    if (_zoom.isZoomed) return;
+    final target = _index + delta;
+    if (target < 0 || target >= widget.cards.length) return;
+    _pages.animateToPage(
+      target,
+      duration: _pageDuration,
+      curve: Curves.easeOut,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final card = widget.cards[_index];
@@ -54,41 +70,59 @@ class _CardViewerScreenState extends State<CardViewerScreen> {
       listenable: widget.viewModel,
       builder: (context, _) {
         final excluded = widget.viewModel.isExcluded(card);
-        return Scaffold(
-          appBar: AppBar(
-            title: AppBarTitle(card.name),
-            actions: [
-              IconButton(
-                tooltip: excludeLabel(excluded),
-                icon: Icon(excludeIcon(excluded)),
-                onPressed: () => widget.viewModel.toggleExcluded(card),
+        return CallbackShortcuts(
+          bindings: {
+            const SingleActivator(LogicalKeyboardKey.arrowLeft):
+                () => _turn(-1),
+            const SingleActivator(LogicalKeyboardKey.arrowRight):
+                () => _turn(1),
+          },
+          child: Focus(
+            autofocus: true,
+            child: Scaffold(
+              appBar: AppBar(
+                title: AppBarTitle(card.name),
+                actions: [
+                  IconButton(
+                    tooltip: excludeLabel(excluded),
+                    icon: Icon(excludeIcon(excluded)),
+                    onPressed: () => widget.viewModel.toggleExcluded(card),
+                  ),
+                ],
               ),
-            ],
-          ),
-          body: Column(
-            children: [
-              Expanded(
-                child: PageView.builder(
-                  controller: _pages,
-                  // A zoomed card pans with one finger instead of turning the page.
-                  physics: _zoom.isZoomed ? const NeverScrollableScrollPhysics() : null,
-                  itemCount: widget.cards.length,
-                  onPageChanged: (page) {
-                    _zoom.reset();
-                    setState(() => _index = page);
-                    widget.onIndexChanged?.call(page);
-                  },
-                  itemBuilder: (context, page) => ZoomableCard(card: widget.cards[page], controller: _zoom),
-                ),
+              body: Column(
+                children: [
+                  Expanded(
+                    child: PageView.builder(
+                      controller: _pages,
+                      // A zoomed card pans with one finger instead of turning the page.
+                      physics:
+                          _zoom.isZoomed
+                              ? const NeverScrollableScrollPhysics()
+                              : null,
+                      itemCount: widget.cards.length,
+                      onPageChanged: (page) {
+                        _zoom.reset();
+                        setState(() => _index = page);
+                        widget.onIndexChanged?.call(page);
+                      },
+                      itemBuilder:
+                          (context, page) => ZoomableCard(
+                            card: widget.cards[page],
+                            controller: _zoom,
+                          ),
+                    ),
+                  ),
+                  ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxWidth: contentMaxWidth,
+                      maxHeight: MediaQuery.sizeOf(context).height * 0.4,
+                    ),
+                    child: CardTextPanel(card: card),
+                  ),
+                ],
               ),
-              ConstrainedBox(
-                constraints: BoxConstraints(
-                  maxWidth: contentMaxWidth,
-                  maxHeight: MediaQuery.sizeOf(context).height * 0.4,
-                ),
-                child: CardTextPanel(card: card),
-              ),
-            ],
+            ),
           ),
         );
       },

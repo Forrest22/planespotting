@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 const String _appName = 'Planespotting';
 final Uri _scryfallUri = Uri.parse('https://scryfall.com');
+final Uri _websiteUri = Uri.parse('https://forrestthe.dev');
 
 class AboutScreen extends StatefulWidget {
   const AboutScreen({super.key});
@@ -16,20 +17,17 @@ class AboutScreen extends StatefulWidget {
 class _AboutScreenState extends State<AboutScreen> {
   late final Future<PackageInfo> _info = PackageInfo.fromPlatform();
 
-  Future<void> _openScryfall() async {
+  Future<void> _openLink(Uri uri) async {
     final messenger = ScaffoldMessenger.of(context);
     var opened = false;
     try {
-      opened = await launchUrl(
-        _scryfallUri,
-        mode: LaunchMode.externalApplication,
-      );
+      opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
     } catch (_) {
       // Falls through to the message below.
     }
     if (!opened) {
       messenger.showSnackBar(
-        const SnackBar(content: Text('Could not open scryfall.com')),
+        SnackBar(content: Text('Could not open ${uri.host}')),
       );
     }
   }
@@ -70,7 +68,13 @@ class _AboutScreenState extends State<AboutScreen> {
                 style: textTheme.bodyLarge,
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 24),
+              Align(
+                child: TextButton(
+                  onPressed: () => _openLink(_websiteUri),
+                  child: Text(_websiteUri.host),
+                ),
+              ),
+              const SizedBox(height: 16),
               Text(
                 'Planespotting is unofficial Fan Content permitted under the Wizards of the Coast Fan Content '
                 'Policy. It is not approved or endorsed by Wizards. Portions of the materials used are property '
@@ -85,7 +89,7 @@ class _AboutScreenState extends State<AboutScreen> {
               Align(
                 alignment: Alignment.centerLeft,
                 child: TextButton(
-                  onPressed: _openScryfall,
+                  onPressed: () => _openLink(_scryfallUri),
                   child: const Text('scryfall.com'),
                 ),
               ),

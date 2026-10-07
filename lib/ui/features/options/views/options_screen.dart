@@ -39,36 +39,32 @@ class _OptionsScreenState extends State<OptionsScreen> {
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: contentMaxWidth),
           child: ListenableBuilder(
-          listenable: viewModel,
-          builder: (context, _) {
-            return ListView(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              children: [
-                const _SectionHeader('Game'),
-                SwitchListTile(
-                  title: const Text('Planeswalk automatically'),
-                  subtitle: const Text(
-                    'Moves to the next plane after a planeswalk roll',
+            listenable: viewModel,
+            builder: (context, _) {
+              return ListView(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                children: [
+                  const _SectionHeader('Game'),
+                  SwitchListTile(
+                    title: const Text('Planeswalk automatically'),
+                    subtitle: const Text(
+                      'Moves to the next plane after a planeswalk roll',
+                    ),
+                    value: viewModel.autoPlaneswalk,
+                    onChanged: viewModel.setAutoPlaneswalk,
                   ),
-                  value: viewModel.autoPlaneswalk,
-                  onChanged: viewModel.setAutoPlaneswalk,
-                ),
-                SwitchListTile(
-                  title: const Text('Keep screen on during a game'),
-                  value: viewModel.keepScreenOn,
-                  onChanged: viewModel.setKeepScreenOn,
-                ),
-                const SizedBox(height: 24),
-                const Divider(height: 1),
-                const _SectionHeader('Deck'),
-                _DeckTotalTile(count: viewModel.deckCount),
-                if (viewModel.excludedCount > 0)
-                  _ExcludedCardsTile(viewModel: viewModel),
-                for (final section in viewModel.sections)
-                  _SectionTile(section: section),
-              ],
-            );
-          },
+                  SwitchListTile(
+                    title: const Text('Keep screen on during a game'),
+                    value: viewModel.keepScreenOn,
+                    onChanged: viewModel.setKeepScreenOn,
+                  ),
+                  const SizedBox(height: 24),
+                  const Divider(height: 1),
+                  const _SectionHeader('Deck'),
+                  _DeckTile(count: viewModel.deckCount),
+                ],
+              );
+            },
           ),
         ),
       ),
@@ -100,9 +96,9 @@ class _SectionHeader extends StatelessWidget {
   }
 }
 
-/// How many cards the game will draw from, across every setting and exclusion.
-class _DeckTotalTile extends StatelessWidget {
-  const _DeckTotalTile({required this.count});
+/// How many cards the game will draw from, and the way into the browser where the deck is edited.
+class _DeckTile extends StatelessWidget {
+  const _DeckTile({required this.count});
 
   final int count;
 
@@ -114,87 +110,12 @@ class _DeckTotalTile extends StatelessWidget {
     return ListTile(
       leading: empty ? Icon(Icons.warning_amber_rounded, color: theme.colorScheme.error) : null,
       title: Text('${cardCount(count)} in the deck', style: theme.textTheme.titleMedium),
-      subtitle: empty
-          ? Text('Turn on at least one set and type', style: TextStyle(color: theme.colorScheme.error))
-          : null,
-    );
-  }
-}
-
-class _SectionTile extends StatelessWidget {
-  const _SectionTile({required this.section});
-
-  final OptionSection section;
-
-  @override
-  Widget build(BuildContext context) {
-    if (section.items.isEmpty) return const SizedBox.shrink();
-    return ExpansionTile(
-      title: Text(section.title),
       subtitle: Text(
-        '${cardCount(section.enabledCardCount)} enabled',
+        empty ? 'Turn on at least one set and type in Browse cards' : 'Choose sets, types and cards in Browse cards',
+        style: empty ? TextStyle(color: theme.colorScheme.error) : null,
       ),
-      children: [
-        CheckboxListTile(
-          title: const Text('Select all'),
-          value: section.allEnabled,
-          onChanged: (value) => section.onSetAll(value ?? false),
-        ),
-        for (final item in section.items)
-          CheckboxListTile(
-            title: Text('${item.label} (${item.count})'),
-            value: item.enabled,
-            onChanged: (value) => item.onChanged(value ?? false),
-          ),
-      ],
-    );
-  }
-}
-
-/// Cards excluded one by one in the card browser, with shortcuts to review or undo that.
-class _ExcludedCardsTile extends StatelessWidget {
-  const _ExcludedCardsTile({required this.viewModel});
-
-  final OptionsViewModel viewModel;
-
-  Future<void> _restore(BuildContext context) async {
-    final messenger = ScaffoldMessenger.of(context);
-    final restored = await viewModel.restoreExcluded();
-    messenger.showSnackBar(
-      SnackBar(
-        content: Text('${cardCount(restored.length)} restored'),
-        action: SnackBarAction(label: 'Undo', onPressed: () => viewModel.undoRestore(restored)),
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final count = viewModel.excludedCount;
-    return Column(
-      children: [
-        ListTile(
-          title: const Text('Excluded cards'),
-          subtitle: Text('${cardCount(count)} excluded individually'),
-        ),
-        // Wraps onto two lines when there isn't room for both buttons side by side.
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: OverflowBar(
-            alignment: MainAxisAlignment.end,
-            children: [
-              TextButton(
-                onPressed: () => Navigator.pushNamed(context, browserRoute),
-                child: const Text('Browse cards'),
-              ),
-              TextButton(
-                onPressed: () => _restore(context),
-                child: const Text('Restore all'),
-              ),
-            ],
-          ),
-        ),
-      ],
+      trailing: const Icon(Icons.chevron_right),
+      onTap: () => Navigator.pushNamed(context, browserRoute),
     );
   }
 }

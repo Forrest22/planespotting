@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart' show PointerDeviceKind;
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:planespotting/ui/features/about/views/about_screen.dart';
@@ -35,6 +36,8 @@ class MyApp extends StatelessWidget {
       theme: appTheme(Brightness.light),
       darkTheme: appTheme(Brightness.dark),
       themeMode: ThemeMode.system,
+      // Swipe with a mouse or trackpad too, so card pages turn by dragging on desktop.
+      scrollBehavior: const MaterialScrollBehavior().copyWith(dragDevices: PointerDeviceKind.values.toSet()),
       home: MenuScreen(),
       routes: {
         planeschaseStartRoute: (context) => GameScreen(

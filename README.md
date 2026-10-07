@@ -41,3 +41,4 @@ Card images and data come from [Scryfall](https://scryfall.com), which is not af
 Notes to self:
 
 - custom cards?
+- plancheDH implementation?

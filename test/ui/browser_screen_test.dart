@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:planespotting/data/repositories/settings_repository.dart';
 import 'package:planespotting/domain/models/planechase_card.dart';
@@ -44,6 +45,7 @@ void main() {
   testWidgets('a set chip, the search box and Clear filters narrow and restore the grid', (tester) async {
     await pumpBrowser(tester);
 
+    await tester.ensureVisible(find.widgetWithText(FilterChip, 'Doctor Who')); // the sets come last in the row
     await tester.tap(find.widgetWithText(FilterChip, 'Doctor Who'));
     await tester.pumpAndSettle();
     expect(find.byIcon(Icons.block), findsNWidgets(2));
@@ -86,6 +88,40 @@ void main() {
     await tester.fling(find.byType(PageView), const Offset(-600, 0), 1500); // swipe to the next result
     await tester.pumpAndSettle();
     expect(find.descendant(of: panel, matching: find.text('Text for Chaotic Aether')), findsOneWidget);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft); // and the arrow keys turn pages too
+    await tester.pumpAndSettle();
+    expect(find.descendant(of: panel, matching: find.text('Text for Esper')), findsOneWidget);
+  });
+
+  testWidgets('the deck sheet turns sets on and off, and restores excluded cards', (tester) async {
+    final settings = await pumpBrowser(tester);
+    expect(find.textContaining('4 cards in the deck'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Deck settings'));
+    await tester.pumpAndSettle();
+    expect(find.text('4 cards enabled'), findsNWidgets(1)); // Sets: moc (2) + who (2)
+    expect(find.text('0 cards enabled'), findsOneWidget); // Un-cards are off by default
+
+    await tester.tap(find.text('Sets'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Doctor Who (2)'));
+    await tester.pumpAndSettle();
+    expect(find.text('2 cards in the deck'), findsOneWidget);
+
+    await settings.setCardExcluded('moc-49', true);
+    await tester.pumpAndSettle();
+    expect(find.text('1 card excluded individually'), findsOneWidget);
+    await tester.tap(find.text('Restore all'));
+    await tester.pumpAndSettle();
+    expect(settings.denylist, isEmpty);
+    expect(find.text('Excluded cards'), findsNothing);
+  });
+
+  testWidgets('the filter chips list Included and Excluded only, then the types, then the sets', (tester) async {
+    await pumpBrowser(tester);
+    final labels = tester.widgetList<FilterChip>(find.byType(FilterChip)).map((chip) => (chip.label as Text).data);
+    expect(labels.take(4), ['Included only', 'Excluded only', 'Planes', 'Phenomena']);
   });
 
   testWidgets('only the screen plus a few rows of tiles are built, wherever you scroll', (tester) async {

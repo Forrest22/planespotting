@@ -6,7 +6,7 @@ import 'package:planespotting/domain/models/planechase_card.dart';
 /// Search and filter state for the card browser, plus excluding cards from the game.
 ///
 /// The set and type filters only narrow what the browser lists; which sets and types the
-/// game draws from is still set in Options.
+/// game draws from is set in the deck settings sheet.
 class BrowserViewModel extends ChangeNotifier {
   BrowserViewModel({required CardRepository cardRepository, required SettingsRepository settingsRepository})
       : _cards = cardRepository,
@@ -21,24 +21,28 @@ class BrowserViewModel extends ChangeNotifier {
   final Set<String> _selectedSets = {};
   final Set<CardType> _selectedTypes = {};
   bool _excludedOnly = false;
+  bool _includedOnly = false;
 
   String get query => _query;
   Set<String> get selectedSets => Set.unmodifiable(_selectedSets);
   Set<CardType> get selectedTypes => Set.unmodifiable(_selectedTypes);
   bool get excludedOnly => _excludedOnly;
+
+  /// Only cards the game can draw: not excluded, and in a set and of a type that are on.
+  bool get includedOnly => _includedOnly;
   List<CardSet> get sets => _cards.sets;
 
   bool get hasActiveFilters =>
-      _query.isNotEmpty || _selectedSets.isNotEmpty || _selectedTypes.isNotEmpty || _excludedOnly;
+      _query.isNotEmpty || _selectedSets.isNotEmpty || _selectedTypes.isNotEmpty || _excludedOnly || _includedOnly;
 
   /// Cards passing every filter, in repository order, except that cards whose set or type is
-  /// turned off in Options come last. (Cards excluded one by one stay where they are, so a tile
+  /// turned off in the deck settings come last. (Cards excluded one by one stay where they are, so a tile
   /// doesn't jump away the moment you exclude it.) An empty set or type selection means all.
   List<PlanechaseCard> get entries {
     final shown = _filtered;
     return [
-      ...shown.where((card) => !isHiddenByOptions(card)),
-      ...shown.where(isHiddenByOptions),
+      ...shown.where((card) => !isOutOfDeck(card)),
+      ...shown.where(isOutOfDeck),
     ];
   }
 
@@ -48,6 +52,7 @@ class BrowserViewModel extends ChangeNotifier {
       if (_selectedSets.isNotEmpty && !_selectedSets.contains(card.set)) return false;
       if (_selectedTypes.isNotEmpty && !_selectedTypes.contains(card.type)) return false;
       if (_excludedOnly && !isExcluded(card)) return false;
+      if (_includedOnly && !isInPlay(card)) return false;
       if (needle.isEmpty) return true;
       return card.name.toLowerCase().contains(needle) ||
           card.oracleText.toLowerCase().contains(needle) ||
@@ -55,15 +60,20 @@ class BrowserViewModel extends ChangeNotifier {
     }).toList();
   }
 
-  /// Excluded one by one, as opposed to hidden because its set or type is off in Options.
+  /// Excluded one by one, as opposed to out of the deck because its set or type is off.
   bool isExcluded(PlanechaseCard card) => _settings.isExcluded(card.id);
 
   /// Whether the game can draw this card.
   bool isInPlay(PlanechaseCard card) =>
       _settings.isSetEnabled(card.set) && _settings.isTypeEnabled(card.type) && !isExcluded(card);
 
-  /// Excluded by set or type being off, rather than excluded on its own.
-  bool isHiddenByOptions(PlanechaseCard card) => !_settings.isSetEnabled(card.set) || !_settings.isTypeEnabled(card.type);
+  /// Out of the deck because its set or type is off in the deck settings, rather than excluded on its own.
+  bool isOutOfDeck(PlanechaseCard card) => !_settings.isSetEnabled(card.set) || !_settings.isTypeEnabled(card.type);
+
+  /// Cards the game will actually draw from: enabled sets and types, minus excluded cards.
+  int get deckCount => _cards
+      .filter(enabledSets: _settings.enabledSets, enabledTypes: _settings.enabledTypes, denylist: _settings.denylist)
+      .length;
 
   Future<void> toggleExcluded(PlanechaseCard card) => _settings.setCardExcluded(card.id, !isExcluded(card));
 
@@ -94,8 +104,16 @@ class BrowserViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  // Excluded only and included only can't both hold, so turning one on turns the other off.
   void setExcludedOnly(bool value) {
     _excludedOnly = value;
+    if (value) _includedOnly = false;
+    notifyListeners();
+  }
+
+  void setIncludedOnly(bool value) {
+    _includedOnly = value;
+    if (value) _excludedOnly = false;
     notifyListeners();
   }
 
@@ -104,6 +122,7 @@ class BrowserViewModel extends ChangeNotifier {
     _selectedSets.clear();
     _selectedTypes.clear();
     _excludedOnly = false;
+    _includedOnly = false;
     notifyListeners();
   }
 

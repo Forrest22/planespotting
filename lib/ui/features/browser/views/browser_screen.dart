@@ -12,6 +12,7 @@ import 'package:planespotting/ui/core/exclude_toggle.dart';
 import 'package:planespotting/ui/core/ui_constants.dart';
 import 'package:planespotting/ui/features/browser/view_models/browser_view_model.dart';
 import 'package:planespotting/ui/features/browser/views/card_viewer_screen.dart';
+import 'package:planespotting/ui/features/browser/views/deck_sheet.dart';
 
 // Grid geometry, shared by the grid delegate and the preload window below so they can't drift.
 const double _gridPadding = 12;
@@ -57,6 +58,7 @@ class _BrowserScreenState extends State<BrowserScreen> {
   );
   final TextEditingController _search = TextEditingController();
   final ScrollController _grid = ScrollController();
+  final ScrollController _chips = ScrollController();
 
   // The grid is only built once the page-open animation has finished, and then it fills in a few
   // rows per frame (see _revealTilesPerFrame), so opening the screen never lays out dozens of tiles at once.
@@ -102,6 +104,7 @@ class _BrowserScreenState extends State<BrowserScreen> {
     _routeAnimation?.removeStatusListener(_onRouteStatus);
     _revealed.dispose();
     _grid.dispose();
+    _chips.dispose();
     _search.dispose();
     _viewModel.dispose();
     super.dispose();
@@ -155,7 +158,7 @@ class _BrowserScreenState extends State<BrowserScreen> {
         title: Text('${exclude ? 'Exclude' : 'Include'} ${cardCount(count)}?'),
         content: Text(
           exclude
-              ? "They won't come up in games. Include them again here, or with Restore all in Options."
+              ? "They won't come up in games. Include them again here, or with Restore all in Deck settings."
               : 'They can come up in games again.',
         ),
         actions: [
@@ -178,6 +181,15 @@ class _BrowserScreenState extends State<BrowserScreen> {
       appBar: AppBar(
         title: const Text('Browse cards'),
         actions: [
+          IconButton(
+            tooltip: 'Deck settings',
+            icon: const Icon(Icons.tune),
+            onPressed: () => showDeckSheet(
+              context,
+              cardRepository: widget.cardRepository,
+              settingsRepository: widget.settingsRepository,
+            ),
+          ),
           ListenableBuilder(
             listenable: _viewModel,
             builder: (context, _) => PopupMenuButton<_BulkAction>(
@@ -234,9 +246,18 @@ class _BrowserScreenState extends State<BrowserScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                 child: Align(
                   alignment: Alignment.centerLeft,
-                  child: Text(
-                    '${cardCount(entries.length)} · '
-                    'Filters only. Turn sets on or off in Options.',
+                  child: Text.rich(
+                    TextSpan(
+                      children: [
+                        TextSpan(text: '${cardCount(entries.length)} shown · '),
+                        TextSpan(
+                          text: '${cardCount(_viewModel.deckCount)} in the deck',
+                          style: _viewModel.deckCount == 0
+                              ? TextStyle(color: Theme.of(context).colorScheme.error)
+                              : null,
+                        ),
+                      ],
+                    ),
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                 ),
@@ -250,21 +271,26 @@ class _BrowserScreenState extends State<BrowserScreen> {
   }
 
   Widget _buildChips() {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      child: Row(
-        children: [
-          for (final set in _viewModel.sets)
-            _chip(set.name, _viewModel.selectedSets.contains(set.code), () => _viewModel.toggleSet(set.code)),
-          _chip('Planes', _viewModel.selectedTypes.contains(CardType.plane), () => _viewModel.toggleType(CardType.plane)),
-          _chip(
-            'Phenomena',
-            _viewModel.selectedTypes.contains(CardType.phenomenon),
-            () => _viewModel.toggleType(CardType.phenomenon),
-          ),
-          _chip('Excluded only', _viewModel.excludedOnly, () => _viewModel.setExcludedOnly(!_viewModel.excludedOnly)),
-        ],
+    return _FadingEdges(
+      controller: _chips,
+      child: SingleChildScrollView(
+        controller: _chips,
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        child: Row(
+          children: [
+            _chip('Included only', _viewModel.includedOnly, () => _viewModel.setIncludedOnly(!_viewModel.includedOnly)),
+            _chip('Excluded only', _viewModel.excludedOnly, () => _viewModel.setExcludedOnly(!_viewModel.excludedOnly)),
+            _chip('Planes', _viewModel.selectedTypes.contains(CardType.plane), () => _viewModel.toggleType(CardType.plane)),
+            _chip(
+              'Phenomena',
+              _viewModel.selectedTypes.contains(CardType.phenomenon),
+              () => _viewModel.toggleType(CardType.phenomenon),
+            ),
+            for (final set in _viewModel.sets)
+              _chip(set.name, _viewModel.selectedSets.contains(set.code), () => _viewModel.toggleSet(set.code)),
+          ],
+        ),
       ),
     );
   }
@@ -323,6 +349,97 @@ class _BrowserScreenState extends State<BrowserScreen> {
   }
 }
 
+/// Fades the edge of a horizontal scroll view that has more to scroll to, and puts a chevron over
+/// each faded edge that scrolls that way, so a row that runs off the screen (the filter chips) doesn't
+/// look like it ends there. [controller] is the one the scroll view [child] uses.
+class _FadingEdges extends StatefulWidget {
+  const _FadingEdges({required this.controller, required this.child});
+
+  final ScrollController controller;
+  final Widget child;
+
+  @override
+  State<_FadingEdges> createState() => _FadingEdgesState();
+}
+
+class _FadingEdgesState extends State<_FadingEdges> {
+  static const double _fadeWidth = 40;
+
+  bool _fadeLeft = false;
+  bool _fadeRight = false;
+
+  bool _update(ScrollMetrics metrics) {
+    final left = metrics.extentBefore > 0;
+    final right = metrics.extentAfter > 0;
+    if (left != _fadeLeft || right != _fadeRight) {
+      setState(() {
+        _fadeLeft = left;
+        _fadeRight = right;
+      });
+    }
+    return false;
+  }
+
+  /// Scrolls by most of the visible width: [direction] is 1 for right, -1 for left.
+  void _scroll(int direction) {
+    final position = widget.controller.position;
+    widget.controller.animateTo(
+      (position.pixels + direction * position.viewportDimension * 0.7)
+          .clamp(position.minScrollExtent, position.maxScrollExtent),
+      duration: const Duration(milliseconds: 250),
+      curve: Curves.easeOut,
+    );
+  }
+
+  Widget _chevron({required bool left}) {
+    return Align(
+      alignment: left ? Alignment.centerLeft : Alignment.centerRight,
+      child: IconButton(
+        tooltip: left ? 'Scroll filters back' : 'Scroll filters',
+        icon: Icon(left ? Icons.chevron_left : Icons.chevron_right),
+        iconSize: 24,
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints.tightFor(width: 32, height: 32),
+        onPressed: () => _scroll(left ? -1 : 1),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Scrolling reports through ScrollNotification; the first layout and a resize through
+    // ScrollMetricsNotification.
+    return NotificationListener<ScrollMetricsNotification>(
+      onNotification: (notification) => _update(notification.metrics),
+      child: NotificationListener<ScrollNotification>(
+        onNotification: (notification) => _update(notification.metrics),
+        child: Stack(
+          children: [
+            ShaderMask(
+              blendMode: BlendMode.dstIn,
+              shaderCallback: (bounds) {
+                final fade = (_fadeWidth / bounds.width).clamp(0.0, 0.5);
+                return LinearGradient(
+                  colors: [
+                    _fadeLeft ? Colors.transparent : Colors.black,
+                    Colors.black,
+                    Colors.black,
+                    _fadeRight ? Colors.transparent : Colors.black,
+                  ],
+                  stops: [0, fade, 1 - fade, 1],
+                ).createShader(bounds);
+              },
+              child: widget.child,
+            ),
+            if (_fadeLeft) Positioned.fill(child: _chevron(left: true)),
+            if (_fadeRight) Positioned.fill(child: _chevron(left: false)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _CardTile extends StatelessWidget {
   const _CardTile({required this.card, required this.viewModel, required this.onOpen});
 
@@ -334,7 +451,7 @@ class _CardTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     final excluded = viewModel.isExcluded(card);
-    final hidden = viewModel.isHiddenByOptions(card);
+    final hidden = viewModel.isOutOfDeck(card);
     return Stack(
       children: [
         // Say out loud what the dimming shows.
